@@ -16,37 +16,37 @@
 ;; run :: List[Instruction], List[Instructions] -> CONST
 (defun (run ins-list stack)
   #;(begin
-    (display "\ninstructions\n")
-    (print ins-list)
-    (display "\nstack\n")
-    (print stack)
-    )
+      (display "\ninstructions\n")
+      (print ins-list)
+      (display "\nstack\n")
+      (print stack)
+      )
   (match ins-list
-    ['() (first stack)]
-    [(list (CONST n) tail-instructions ...) 
-     (run tail-instructions (cons (CONST n) stack))]
-    [(list (ADD) tail-instructions ...) (def (CONST n1) (first stack))
-                                        (def (CONST n2) (second stack))
-                                        (def new-stack (drop stack 2))
-                                        (run tail-instructions (cons (CONST (+ n2 n1)) new-stack))]
-    [(list (SUB) tail-instructions ...) (def (CONST n1) (first stack))
-                                        (def (CONST n2) (second stack))
-                                        (def new-stack (drop stack 2))
-                                        (run tail-instructions (cons (CONST (- n2 n1)) new-stack))]))
+    ['() (stack-top stack)]
+    [(list (CONST n) tail-instructions ...)
+     (run tail-instructions (stack-push stack (CONST n)))]
+    [(list (ADD) tail-instructions ...) (def (CONST n1) (stack-top stack))
+                                        (def (CONST n2) (stack-top (stack-pop stack)))
+                                        (def new-stack (stack-pop (stack-pop stack)))
+                                        (run tail-instructions (stack-push new-stack (CONST (+ n2 n1))))]
+    [(list (SUB) tail-instructions ...) (def (CONST n1) (stack-top stack))
+                                        (def (CONST n2) (stack-top (stack-pop stack)))
+                                        (def new-stack (stack-pop (stack-pop stack)))
+                                        (run tail-instructions (stack-push new-stack (CONST (- n2 n1))))]))
 
-(test (run (list (CONST 5)) '())
+(test (run (list (CONST 5)) (stack-init))
       (CONST 5))
 
 (test (run (list (CONST 1)
-                     (CONST 2)
-                     (ADD)) '())
+                 (CONST 2)
+                 (ADD)) (stack-init))
       (CONST 3))
 
 (test (run (list (CONST 5)
-                     (CONST 1)
-                     (CONST 2)
-                     (ADD)
-                     (SUB)) '()) 
+                 (CONST 1)
+                 (CONST 2)
+                 (ADD)
+                 (SUB)) (stack-init)) 
       (CONST 2))
 
 ;;;;;;;;;;;;;;;;;;;;;;;
