@@ -24,16 +24,16 @@
 
 ;; run :: List[Instruction], Stack -> CONST
 ;; SIGFAULT: thrown when the underlying constructs fail
-;; CORRUPT_STACK: thrown when the machine ends with a stack with size different from one 
+;; CORRUPT_ENDING_STATE: thrown when the machine ends with a stack with size different from one 
 (defun (run ins-list stack)
   (let ([non-local-exn? (λ(ex) (not (string=? (exn-message ex) 
-                                              "CORRUPT_STACK")))]
+                                              "CORRUPT_ENDING_STATE")))]
         [fault (λ(ex) (error "SIGFAULT"))])
     ;(debug-run ins-list stack)
     (match ins-list
       ['() (if (= 1 (stack-size stack))
                (stack-top stack)
-               (error "CORRUPT_STACK"))]
+               (error "CORRUPT_ENDING_STATE"))]
       [(list (CONST n) tail-instructions ...)
        (run tail-instructions (stack-push stack (CONST n)))]
       [(list (ADD) tail-instructions ...)
@@ -47,8 +47,7 @@
          (def (CONST n1) (stack-top stack))
          (def (CONST n2) (stack-top (stack-pop stack)))
          (def new-stack (stack-pop (stack-pop stack)))
-         (run tail-instructions (stack-push new-stack (CONST (- n2 n1)))))]))
-  )
+         (run tail-instructions (stack-push new-stack (CONST (- n2 n1)))))])))
 
 (test (run (list (CONST 5)) 
            (stack-init))
@@ -70,19 +69,19 @@
 
 (test/exn (run (list (CONST 5)
                      (CONST 2)) 
-               (stack-init)) "CORRUPT_STACK")
+               (stack-init)) "CORRUPT_ENDING_STATE")
 
 (test/exn (run (list (CONST 5)
                      (CONST 2)
                      (CONST 2)
                      (ADD)) 
-               (stack-init)) "CORRUPT_STACK")
+               (stack-init)) "CORRUPT_ENDING_STATE")
 
 (test/exn (run (list (CONST 5)
                      (CONST 2)
                      (CONST 2)
                      (SUB)) 
-               (stack-init)) "CORRUPT_STACK")
+               (stack-init)) "CORRUPT_ENDING_STATE")
 
 (test/exn (run (list (ADD)) (stack-init)) "SIGFAULT")
 (test/exn (run (list (CONST 1) (ADD)) (stack-init)) "SIGFAULT")
