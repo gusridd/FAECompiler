@@ -1,5 +1,7 @@
 #lang play
 
+(print-only-errors #t)
+
 ;; ADT STACK
 
 (deftype Stack
