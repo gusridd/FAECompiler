@@ -59,3 +59,11 @@
 
 (test (stack-size (EmptyStack)) 0)
 (test (stack-size (Stacked 8 (Stacked 4 (EmptyStack)))) 2)
+
+;; stack-debug :: Stack -> void
+(defun (stack-debug stack)
+  (letrec ([collectString (λ(s)
+                            (match s
+                              [(EmptyStack) ""]
+                              [(Stacked v next) (string-append (~v v) " ] " (collectString next))]))])
+    (display (collectString stack))))
