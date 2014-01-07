@@ -13,41 +13,82 @@
   (ADD)
   (SUB))
 
-;; run :: List[Instruction], List[Instructions] -> CONST
-(defun (run ins-list stack)
-  #;(begin
-      (display "\ninstructions\n")
-      (print ins-list)
-      (display "\nstack\n")
-      (print stack)
-      )
-  (match ins-list
-    ['() (stack-top stack)]
-    [(list (CONST n) tail-instructions ...)
-     (run tail-instructions (stack-push stack (CONST n)))]
-    [(list (ADD) tail-instructions ...) (def (CONST n1) (stack-top stack))
-                                        (def (CONST n2) (stack-top (stack-pop stack)))
-                                        (def new-stack (stack-pop (stack-pop stack)))
-                                        (run tail-instructions (stack-push new-stack (CONST (+ n2 n1))))]
-    [(list (SUB) tail-instructions ...) (def (CONST n1) (stack-top stack))
-                                        (def (CONST n2) (stack-top (stack-pop stack)))
-                                        (def new-stack (stack-pop (stack-pop stack)))
-                                        (run tail-instructions (stack-push new-stack (CONST (- n2 n1))))]))
+;; Debug function for the machine
+(defun (debug-run ins-list stack)
+  (begin
+    (display "\ninstructions: ")
+    (print ins-list)
+    (display "\nstack: ")
+    (stack-debug stack)
+    (display "\n")))
 
-(test (run (list (CONST 5)) (stack-init))
+;; run :: List[Instruction], Stack -> CONST
+;; SIGFAULT: thrown when the underlying constructs fail
+;; CORRUPT_STACK: thrown when the machine ends with a stack with size different from one 
+(defun (run ins-list stack)
+  (let ([non-local-exn? (λ(ex) (not (string=? (exn-message ex) 
+                                              "CORRUPT_STACK")))]
+        [fault (λ(ex) (error "SIGFAULT"))])
+    ;(debug-run ins-list stack)
+    (match ins-list
+      ['() (if (= 1 (stack-size stack))
+               (stack-top stack)
+               (error "CORRUPT_STACK"))]
+      [(list (CONST n) tail-instructions ...)
+       (run tail-instructions (stack-push stack (CONST n)))]
+      [(list (ADD) tail-instructions ...)
+       (with-handlers ([non-local-exn? fault])
+         (def (CONST n1) (stack-top stack))
+         (def (CONST n2) (stack-top (stack-pop stack)))
+         (def new-stack (stack-pop (stack-pop stack)))
+         (run tail-instructions (stack-push new-stack (CONST (+ n2 n1)))))]
+      [(list (SUB) tail-instructions ...)
+       (with-handlers ([non-local-exn? fault])
+         (def (CONST n1) (stack-top stack))
+         (def (CONST n2) (stack-top (stack-pop stack)))
+         (def new-stack (stack-pop (stack-pop stack)))
+         (run tail-instructions (stack-push new-stack (CONST (- n2 n1)))))]))
+  )
+
+(test (run (list (CONST 5)) 
+           (stack-init))
       (CONST 5))
 
 (test (run (list (CONST 1)
                  (CONST 2)
-                 (ADD)) (stack-init))
+                 (ADD)) 
+           (stack-init))
       (CONST 3))
 
 (test (run (list (CONST 5)
                  (CONST 1)
                  (CONST 2)
                  (ADD)
-                 (SUB)) (stack-init)) 
+                 (SUB)) 
+           (stack-init)) 
       (CONST 2))
+
+(test/exn (run (list (CONST 5)
+                     (CONST 2)) 
+               (stack-init)) "CORRUPT_STACK")
+
+(test/exn (run (list (CONST 5)
+                     (CONST 2)
+                     (CONST 2)
+                     (ADD)) 
+               (stack-init)) "CORRUPT_STACK")
+
+(test/exn (run (list (CONST 5)
+                     (CONST 2)
+                     (CONST 2)
+                     (SUB)) 
+               (stack-init)) "CORRUPT_STACK")
+
+(test/exn (run (list (ADD)) (stack-init)) "SIGFAULT")
+(test/exn (run (list (CONST 1) (ADD)) (stack-init)) "SIGFAULT")
+(test/exn (run (list (SUB)) (stack-init)) "SIGFAULT")
+(test/exn (run (list (CONST 1) (SUB)) (stack-init)) "SIGFAULT")
+(test/exn (run (list (CONST 1) (CONST 4) (SUB) (ADD)) (stack-init)) "SIGFAULT")
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;; Language definition
