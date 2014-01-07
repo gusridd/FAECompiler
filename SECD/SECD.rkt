@@ -1,5 +1,9 @@
 #lang play
 
+(require "../stack.rkt")
+
+(print-only-errors #t)
+
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;; Machine definition
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -8,7 +12,6 @@
   (CONST n)
   (ADD)
   (SUB)
-  
   (ACCESS n)
   (CLOSURE c)
   (LET)
@@ -21,10 +24,10 @@
   (numV n)
   (closureV body env))
 
-;; intermediate
+;; intermediate representation for functions and id's
 (deftype Intermediate
-  (brujinFun body)
-  (brujinNumber n))
+  (bruijnFun body)
+  (bruijnNumber n))
 
 
 (defun (n-th list pos)
@@ -34,8 +37,8 @@
 (test (n-th (list 3 4 5) 2) 4)
 (test (n-th (list 3 4 5) 3) 5)
 
-;; process :: List[Instruction], List[Instructions] -> CONST
-(defun (process ins-list stack env)
+;; run :: List[Instruction], List[Instructions] -> CONST
+(defun (run ins-list stack env)
   #;(begin
       (display "\ninstructions\n")
       (print ins-list)
@@ -45,44 +48,44 @@
   (match ins-list
     ['() (first stack)]
     [(list (CONST n) tail-instructions ...) 
-     (process tail-instructions (cons (CONST n) stack) env)]
+     (run tail-instructions (cons (CONST n) stack) env)]
     [(list (ADD) tail-instructions ...) (def (CONST n1) (first stack))
                                         (def (CONST n2) (second stack))
                                         (def new-stack (drop stack 2))
-                                        (process tail-instructions (cons (CONST (+ n2 n1)) new-stack) env)]
+                                        (run tail-instructions (cons (CONST (+ n2 n1)) new-stack) env)]
     [(list (SUB) tail-instructions ...) (def (CONST n1) (first stack))
                                         (def (CONST n2) (second stack))
                                         (def new-stack (drop stack 2))
-                                        (process tail-instructions (cons (CONST (- n2 n1)) new-stack) env)]
+                                        (run tail-instructions (cons (CONST (- n2 n1)) new-stack) env)]
     
-    [(list (ACCESS n) tail-instructions ...) (process tail-instructions 
+    [(list (ACCESS n) tail-instructions ...) (run tail-instructions 
                                                       (cons (n-th env n) stack) 
                                                       env)]
-    [(list (LET) tail-instructions ...) (process tail-instructions 
+    [(list (LET) tail-instructions ...) (run tail-instructions 
                                                  (drop stack 1) 
                                                  (cons (first stack) env))]
-    [(list (ENDLET) tail-instructions ...) (process tail-instructions
+    [(list (ENDLET) tail-instructions ...) (run tail-instructions
                                                     stack
                                                     (drop 1 env))]
-    [(list (CLOSURE cp) tail-instructions ...) (process tail-instructions
+    [(list (CLOSURE cp) tail-instructions ...) (run tail-instructions
                                                         (cons (closureV cp env) stack)
                                                         env)]
     [(list (APPLY) tail-instructions ...) (def v (first stack))
                                           (def (closureV cp ep) (second stack))
                                           (def s (drop stack 2))
-                                          (process cp 
+                                          (run cp 
                                                    (append tail-instructions (cons env (cons s '())))
                                                    (cons v ep))]
     [(list (RETURN) tail-instructions ...) (def v (first stack))
                                            (def cp (second stack))
                                            (def ep (third stack))
                                            (def s (drop stack 3))
-                                           (process cp
+                                           (run cp
                                                     (cons v s)
                                                     ep)]))
 
 (defun (machine ins-list)
-  (process ins-list '() '()))
+  (run ins-list '() '()))
 
 
 (test (machine (list (CONST 5)))
@@ -141,50 +144,50 @@
     [(list f a) (app (parse f) (parse a))]))
 
 
-(defun (DeBrujin expr)
-  (letrec ([auxBrujin (λ(e bid lvl)
+(defun (debruijn expr)
+  (letrec ([auxbruijn (λ(e bid lvl)
                         (match e
                           [(num n) (num n)]
                           [(id x) (if (eq? x bid)
-                                      (brujinNumber lvl)
+                                      (bruijnNumber lvl)
                                       (id x))]
-                          [(add l r) (add (auxBrujin l bid lvl) (auxBrujin r bid lvl))]
-                          [(sub l r) (sub (auxBrujin l bid lvl) (auxBrujin r bid lvl))]
-                          [(app a b) (app (auxBrujin a bid lvl) (auxBrujin b bid lvl))]
+                          [(add l r) (add (auxbruijn l bid lvl) (auxbruijn r bid lvl))]
+                          [(sub l r) (sub (auxbruijn l bid lvl) (auxbruijn r bid lvl))]
+                          [(app a b) (app (auxbruijn a bid lvl) (auxbruijn b bid lvl))]
                           [(fun id body) (if (eq? id bid)
-                                             (DeBrujin (fun id body))
-                                             (DeBrujin (fun id (auxBrujin body bid (+ 1 lvl)))))]
-                          [(brujinFun body) (brujinFun (auxBrujin body bid (+ 1 lvl)))]
-                          [(brujinNumber n) (brujinNumber n)]
+                                             (debruijn (fun id body))
+                                             (debruijn (fun id (auxbruijn body bid (+ 1 lvl)))))]
+                          [(bruijnFun body) (bruijnFun (auxbruijn body bid (+ 1 lvl)))]
+                          [(bruijnNumber n) (bruijnNumber n)]
                           ))])
     (match expr
       [(num n) (num n)]
       [(id x) (id x)]
-      [(add l r) (add (DeBrujin l) (DeBrujin r))]
-      [(sub l r) (sub (DeBrujin l) (DeBrujin r))]
-      [(app a b) (app (DeBrujin a) (DeBrujin b))]
-      [(fun id body) (brujinFun (auxBrujin body id 1))])))
+      [(add l r) (add (debruijn l) (debruijn r))]
+      [(sub l r) (sub (debruijn l) (debruijn r))]
+      [(app a b) (app (debruijn a) (debruijn b))]
+      [(fun id body) (bruijnFun (auxbruijn body id 1))])))
 
-(test (DeBrujin (parse '{+ 1 2}))
+(test (debruijn (parse '{+ 1 2}))
       (parse '{+ 1 2}))
 
-(test (DeBrujin (parse '{fun {x} x}))
-      (brujinFun (brujinNumber 1)))
+(test (debruijn (parse '{fun {x} x}))
+      (bruijnFun (bruijnNumber 1)))
 
-(test (DeBrujin (parse '{fun {x} 
+(test (debruijn (parse '{fun {x} 
                              {fun {y} x}}))
-      (brujinFun (brujinFun (brujinNumber 2))))
+      (bruijnFun (bruijnFun (bruijnNumber 2))))
 
-(test (DeBrujin (parse '{fun {x}
+(test (debruijn (parse '{fun {x}
                              {fun {x} x}}))
-      (brujinFun (brujinFun (brujinNumber 1))))
+      (bruijnFun (bruijnFun (bruijnNumber 1))))
 
-(test (DeBrujin (parse '{{fun {x} {+ x 1}} 2}))
-      (app (brujinFun (add (brujinNumber 1) (num 1))) (num 2)))
+(test (debruijn (parse '{{fun {x} {+ x 1}} 2}))
+      (app (bruijnFun (add (bruijnNumber 1) (num 1))) (num 2)))
 
 ;; compile :: Expr -> List[Instruction]
 (defun (compile expr)
-  (letrec ([e (DeBrujin (parse expr))]
+  (letrec ([e (debruijn (parse expr))]
            [comp (λ(e)
                    (match e
                      [(num n) (list (CONST n))]
@@ -192,8 +195,8 @@
                      [(sub l r) (append (comp l) (comp r) (list (SUB)))]
                      [(app a b) (append (comp a) (comp b) (list (APPLY)))]
                      [(fun id body) (list (CLOSURE (append (comp body) (list (RETURN)))))]
-                     [(brujinFun body) (list (CLOSURE (append (comp body) (list (RETURN)))))]
-                     [(brujinNumber n) (list (ACCESS n))]
+                     [(bruijnFun body) (list (CLOSURE (append (comp body) (list (RETURN)))))]
+                     [(bruijnNumber n) (list (ACCESS n))]
                      ))])
     (comp e)))
 
