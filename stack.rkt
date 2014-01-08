@@ -60,6 +60,24 @@
 (test (stack-size (EmptyStack)) 0)
 (test (stack-size (Stacked 8 (Stacked 4 (EmptyStack)))) 2)
 
+;; stack-to-list :: Stack -> List[V]
+(defun (stack-to-list stack)
+  (match stack
+    [(EmptyStack) '()]
+    [(Stacked v next) (cons v (stack-to-list next))]))
+
+(test (stack-to-list (EmptyStack)) '())
+(test (stack-to-list (Stacked 3 (Stacked 8 (Stacked 1 (EmptyStack))))) (list 3 8 1))
+
+;; list-to-stack :: List[V] -> Stack
+(defun (list-to-stack list)
+  (match list
+    ['() (EmptyStack)]
+    [(cons h t) (Stacked h (list-to-stack t))]))
+
+(test (list-to-stack '()) (EmptyStack))
+(test (list-to-stack (list 3 8 1)) (Stacked 3 (Stacked 8 (Stacked 1 (EmptyStack)))))
+
 ;; stack-debug :: Stack -> void
 (defun (stack-debug stack)
   (letrec ([collectString (λ(s)
@@ -67,3 +85,4 @@
                               [(EmptyStack) ""]
                               [(Stacked v next) (string-append (~v v) " ] " (collectString next))]))])
     (display (collectString stack))))
+
