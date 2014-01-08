@@ -26,8 +26,8 @@
 
 ;; intermediate
 (deftype Intermediate
-  (brujinFun body)
-  (brujinNumber n))
+  (bruijnFun body)
+  (bruijnNumber n))
 
 ;; Debug function for the machine
 (defun (debug-run ins-list stack)
@@ -47,7 +47,9 @@
              (error "CORRUPT_ENDING_STATE"))]
     [_ (let ([non-local-exn? (λ(ex) (not (string=? (exn-message ex) 
                                                    "CORRUPT_ENDING_STATE")))]
-             [fault (λ(ex) (error "SIGFAULT"))])
+             [fault (λ(ex) 
+                      ;(print (exn-message ex)) 
+                      (error "SIGFAULT"))])
          (with-handlers ([non-local-exn? fault])
            (match ins-list
              [(list (CONST n) tail ...) 
@@ -69,7 +71,7 @@
                                          (cons (stack-top stack) env))]
              [(list (ENDLET) tail ...) (run tail
                                             stack
-                                            (drop 1 env))]
+                                            (drop env 1))]
              [(list (CLOSURE cp) tail ...) (run tail
                                                 (stack-push stack (closureV cp env))
                                                 env)]
@@ -105,6 +107,12 @@
                      (ADD)
                      (SUB))) 
       (CONST 2))
+
+(test (machine (list (CONST 3) 
+                     (LET) 
+                     (ACCESS 1) 
+                     (ENDLET)))
+      (CONST 3))
 
 (test/exn (machine (list (CONST 5)
                          (CONST 2))) "CORRUPT_ENDING_STATE")
@@ -148,6 +156,9 @@
 <expr> ::= <num>
          | {+ <expr> <expr>}
          | {- <expr> <expr>}
+         | {with <expr> in <expr>}
+         | {fun {<id>} <expr>}
+         | {<expr> <expr>}
 |#
 (deftype Expr
   (num n)
@@ -155,6 +166,7 @@
   (sub l r)
   (id s)
   (with a b)
+  (acc n)
   (app fun-expr arg-expr)
   (fun id body))
 
@@ -171,64 +183,69 @@
     [(list '+ l r) (add (parse l) (parse r))]
     [(list '- l r) (sub (parse l) (parse r))]
     [(list 'with a 'in b) (with (parse a) (parse b))]
+    [(list 'acc n) (acc n)]
     [(list 'fun (list x) b) (fun x (parse b))]
     [(list f a) (app (parse f) (parse a))]))
 
 
-(defun (DeBrujin expr)
-  (letrec ([auxBrujin (λ(e bid lvl)
+(defun (deBruijn expr)
+  (letrec ([auxBruijn (λ(e bid lvl)
                         (match e
                           [(num n) (num n)]
+                          [(acc n) (acc n)]
                           [(id x) (if (eq? x bid)
-                                      (brujinNumber lvl)
+                                      (bruijnNumber lvl)
                                       (id x))]
-                          [(add l r) (add (auxBrujin l bid lvl) (auxBrujin r bid lvl))]
-                          [(sub l r) (sub (auxBrujin l bid lvl) (auxBrujin r bid lvl))]
-                          [(app a b) (app (auxBrujin a bid lvl) (auxBrujin b bid lvl))]
+                          [(add l r) (add (auxBruijn l bid lvl) (auxBruijn r bid lvl))]
+                          [(sub l r) (sub (auxBruijn l bid lvl) (auxBruijn r bid lvl))]
+                          [(app a b) (app (auxBruijn a bid lvl) (auxBruijn b bid lvl))]
                           [(fun id body) (if (eq? id bid)
-                                             (DeBrujin (fun id body))
-                                             (DeBrujin (fun id (auxBrujin body bid (+ 1 lvl)))))]
-                          [(brujinFun body) (brujinFun (auxBrujin body bid (+ 1 lvl)))]
-                          [(brujinNumber n) (brujinNumber n)]
+                                             (deBruijn (fun id body))
+                                             (deBruijn (fun id (auxBruijn body bid (+ 1 lvl)))))]
+                          [(bruijnFun body) (bruijnFun (auxBruijn body bid (+ 1 lvl)))]
+                          [(bruijnNumber n) (bruijnNumber n)]
                           ))])
     (match expr
       [(num n) (num n)]
+      [(acc n) (acc n)]
       [(id x) (id x)]
-      [(add l r) (add (DeBrujin l) (DeBrujin r))]
-      [(sub l r) (sub (DeBrujin l) (DeBrujin r))]
-      [(app a b) (app (DeBrujin a) (DeBrujin b))]
-      [(fun id body) (brujinFun (auxBrujin body id 1))])))
+      [(add l r) (add (deBruijn l) (deBruijn r))]
+      [(sub l r) (sub (deBruijn l) (deBruijn r))]
+      [(with a b) (with (deBruijn a) (deBruijn b))]
+      [(app a b) (app (deBruijn a) (deBruijn b))]
+      [(fun id body) (bruijnFun (auxBruijn body id 1))])))
 
-(test (DeBrujin (parse '{+ 1 2}))
+(test (deBruijn (parse '{+ 1 2}))
       (parse '{+ 1 2}))
 
-(test (DeBrujin (parse '{fun {x} x}))
-      (brujinFun (brujinNumber 1)))
+(test (deBruijn (parse '{fun {x} x}))
+      (bruijnFun (bruijnNumber 1)))
 
-(test (DeBrujin (parse '{fun {x} 
+(test (deBruijn (parse '{fun {x} 
                              {fun {y} x}}))
-      (brujinFun (brujinFun (brujinNumber 2))))
+      (bruijnFun (bruijnFun (bruijnNumber 2))))
 
-(test (DeBrujin (parse '{fun {x}
+(test (deBruijn (parse '{fun {x}
                              {fun {x} x}}))
-      (brujinFun (brujinFun (brujinNumber 1))))
+      (bruijnFun (bruijnFun (bruijnNumber 1))))
 
-(test (DeBrujin (parse '{{fun {x} {+ x 1}} 2}))
-      (app (brujinFun (add (brujinNumber 1) (num 1))) (num 2)))
+(test (deBruijn (parse '{{fun {x} {+ x 1}} 2}))
+      (app (bruijnFun (add (bruijnNumber 1) (num 1))) (num 2)))
 
 ;; compile :: Expr -> List[Instruction]
 (defun (compile expr)
-  (letrec ([e (DeBrujin (parse expr))]
+  (letrec ([e (deBruijn (parse expr))]
            [comp (λ(e)
                    (match e
                      [(num n) (list (CONST n))]
+                     [(acc n) (list (ACCESS n))]
                      [(add l r) (append (comp l) (comp r) (list (ADD)))]
                      [(sub l r) (append (comp l) (comp r) (list (SUB)))]
                      [(with a b) (append (comp a) (list (LET)) (comp b) (list (ENDLET)))]
                      [(app a b) (append (comp a) (comp b) (list (APPLY)))]
                      [(fun id body) (list (CLOSURE (append (comp body) (list (RETURN)))))]
-                     [(brujinFun body) (list (CLOSURE (append (comp body) (list (RETURN)))))]
-                     [(brujinNumber n) (list (ACCESS n))]))])
+                     [(bruijnFun body) (list (CLOSURE (append (comp body) (list (RETURN)))))]
+                     [(bruijnNumber n) (list (ACCESS n))]))])
     (comp e)))
 
 (test (compile '3)
@@ -263,6 +280,12 @@
       (list (CLOSURE (list (ACCESS 1) (CONST 1) (APPLY) (RETURN))) 
             (CLOSURE (list (ACCESS 1) (CONST 1) (ADD) (RETURN))) 
             (APPLY)))
+
+(test (compile '{with 3 in {acc 1}})
+      (list (CONST 3) 
+            (LET) 
+            (ACCESS 1) 
+            (ENDLET)))
 
 
 
