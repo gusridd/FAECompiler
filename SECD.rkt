@@ -1,5 +1,9 @@
 #lang play
 
+(require "stack.rkt")
+
+(print-only-errors #t)
+
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;; Machine definition
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -8,7 +12,6 @@
   (CONST n)
   (ADD)
   (SUB)
-  
   (ACCESS n)
   (CLOSURE c)
   (LET)
@@ -34,8 +37,8 @@
 (test (n-th (list 3 4 5) 2) 4)
 (test (n-th (list 3 4 5) 3) 5)
 
-;; process :: List[Instruction], List[Instructions] -> CONST
-(defun (process ins-list stack env)
+;; run :: List[Instruction], List[Instructions] -> CONST
+(defun (run ins-list stack env)
   #;(begin
       (display "\ninstructions\n")
       (print ins-list)
@@ -45,44 +48,44 @@
   (match ins-list
     ['() (first stack)]
     [(list (CONST n) tail-instructions ...) 
-     (process tail-instructions (cons (CONST n) stack) env)]
+     (run tail-instructions (cons (CONST n) stack) env)]
     [(list (ADD) tail-instructions ...) (def (CONST n1) (first stack))
                                         (def (CONST n2) (second stack))
                                         (def new-stack (drop stack 2))
-                                        (process tail-instructions (cons (CONST (+ n2 n1)) new-stack) env)]
+                                        (run tail-instructions (cons (CONST (+ n2 n1)) new-stack) env)]
     [(list (SUB) tail-instructions ...) (def (CONST n1) (first stack))
                                         (def (CONST n2) (second stack))
                                         (def new-stack (drop stack 2))
-                                        (process tail-instructions (cons (CONST (- n2 n1)) new-stack) env)]
+                                        (run tail-instructions (cons (CONST (- n2 n1)) new-stack) env)]
     
-    [(list (ACCESS n) tail-instructions ...) (process tail-instructions 
+    [(list (ACCESS n) tail-instructions ...) (run tail-instructions 
                                                       (cons (n-th env n) stack) 
                                                       env)]
-    [(list (LET) tail-instructions ...) (process tail-instructions 
+    [(list (LET) tail-instructions ...) (run tail-instructions 
                                                  (drop stack 1) 
                                                  (cons (first stack) env))]
-    [(list (ENDLET) tail-instructions ...) (process tail-instructions
+    [(list (ENDLET) tail-instructions ...) (run tail-instructions
                                                     stack
                                                     (drop 1 env))]
-    [(list (CLOSURE cp) tail-instructions ...) (process tail-instructions
+    [(list (CLOSURE cp) tail-instructions ...) (run tail-instructions
                                                         (cons (closureV cp env) stack)
                                                         env)]
     [(list (APPLY) tail-instructions ...) (def v (first stack))
                                           (def (closureV cp ep) (second stack))
                                           (def s (drop stack 2))
-                                          (process cp 
+                                          (run cp 
                                                    (append tail-instructions (cons env (cons s '())))
                                                    (cons v ep))]
     [(list (RETURN) tail-instructions ...) (def v (first stack))
                                            (def cp (second stack))
                                            (def ep (third stack))
                                            (def s (drop stack 3))
-                                           (process cp
+                                           (run cp
                                                     (cons v s)
                                                     ep)]))
 
 (defun (machine ins-list)
-  (process ins-list '() '()))
+  (run ins-list '() '()))
 
 
 (test (machine (list (CONST 5)))
