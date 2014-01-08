@@ -114,6 +114,8 @@
                      (ENDLET)))
       (CONST 3))
 
+
+
 (test/exn (machine (list (CONST 5)
                          (CONST 2))) "CORRUPT_ENDING_STATE")
 
@@ -132,6 +134,21 @@
 (test/exn (machine (list (SUB))) "SIGFAULT")
 (test/exn (machine (list (CONST 1) (SUB))) "SIGFAULT")
 (test/exn (machine (list (CONST 1) (CONST 4) (SUB) (ADD))) "SIGFAULT")
+
+(test/exn (machine (list
+                    (CLOSURE (list (ACCESS 1) 
+                                   (ACCESS 1) 
+                                   (CONST 1) 
+                                   (APPLY) 
+                                   (APPLY) 
+                                   (RETURN)))
+                    (LET)
+                    (ACCESS 1)
+                    (ACCESS 1)
+                    (CONST 1)
+                    (APPLY)
+                    (APPLY)
+                    (ENDLET))) "SIGFAULT")
 
 (test (machine (list (CLOSURE (list (ACCESS 1)
                                     (CONST 1)
@@ -154,6 +171,8 @@
 
 #|
 <expr> ::= <num>
+         | <id>
+         | {acc <num>}
          | {+ <expr> <expr>}
          | {- <expr> <expr>}
          | {with <expr> in <expr>}
@@ -171,11 +190,6 @@
   (fun id body))
 
 ;; parse :: s-expr -> Expr
-#| where
-   <s-expr> ::= <num>
-              | (list '+ <s-expr> <s-expr>)
-              | (list '- <s-expr> <s-expr>)
-|#
 (defun (parse s-expr)
   (match s-expr
     [(? number?) (num s-expr)]
@@ -187,7 +201,7 @@
     [(list 'fun (list x) b) (fun x (parse b))]
     [(list f a) (app (parse f) (parse a))]))
 
-
+;; deBruijn :: Expr -> Expr + Intermediate
 (defun (deBruijn expr)
   (letrec ([auxBruijn (λ(e bid lvl)
                         (match e
@@ -216,7 +230,7 @@
       [(fun id body) (bruijnFun (auxBruijn body id 1))])))
 
 (test (deBruijn (parse '{+ 1 2}))
-      (parse '{+ 1 2}))
+      (add (num 1) (num 2)))
 
 (test (deBruijn (parse '{fun {x} x}))
       (bruijnFun (bruijnNumber 1)))
@@ -231,6 +245,12 @@
 
 (test (deBruijn (parse '{{fun {x} {+ x 1}} 2}))
       (app (bruijnFun (add (bruijnNumber 1) (num 1))) (num 2)))
+
+(test (deBruijn (parse '{with {fun {f} {f {f 1}}} in
+                              {{acc 1} {{acc 1} 1}}}))
+      (with
+       (bruijnFun (app (bruijnNumber 1) (app (bruijnNumber 1) (num 1))))
+       (app (acc 1) (app (acc 1) (num 1)))))
 
 ;; compile :: Expr -> List[Instruction]
 (defun (compile expr)
@@ -286,6 +306,23 @@
             (LET) 
             (ACCESS 1) 
             (ENDLET)))
+
+(test (compile '{with {fun {f} {f {f 1}}} in
+                      {{acc 1} {{acc 1} 1}}})
+      (list
+       (CLOSURE (list (ACCESS 1) 
+                      (ACCESS 1) 
+                      (CONST 1) 
+                      (APPLY) 
+                      (APPLY) 
+                      (RETURN)))
+       (LET)
+       (ACCESS 1)
+       (ACCESS 1)
+       (CONST 1)
+       (APPLY)
+       (APPLY)
+       (ENDLET)))
 
 
 
