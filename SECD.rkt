@@ -29,14 +29,18 @@
   (brujinFun body)
   (brujinNumber n))
 
+;; Debug function for the machine
+(defun (debug-run ins-list stack)
+  (begin
+    (display "\ninstructions: ")
+    (print ins-list)
+    (display "\nstack: ")
+    (stack-debug stack)
+    (display "\n")))
+
 ;; run :: List[Instruction], Stack[Instructions], List -> CONST
 (defun (run ins-list stack env)
-  #;(begin
-      (display "\ninstructions\n")
-      (print ins-list)
-      (display "\nstack\n")
-      (print stack)
-      )
+  ;(debug-run ins-list stack)
   (match ins-list
     ['() (stack-top stack)]
     [(list (CONST n) tail ...) 
@@ -95,6 +99,25 @@
                      (SUB))) 
       (CONST 2))
 
+(test/exn (machine (list (CONST 5)
+                         (CONST 2))) "CORRUPT_ENDING_STATE")
+
+(test/exn (machine (list (CONST 5)
+                         (CONST 2)
+                         (CONST 2)
+                         (ADD))) "CORRUPT_ENDING_STATE")
+
+(test/exn (machine (list (CONST 5)
+                         (CONST 2)
+                         (CONST 2)
+                         (SUB))) "CORRUPT_ENDING_STATE")
+
+(test/exn (machine (list (ADD))) "SIGFAULT")
+(test/exn (machine (list (CONST 1) (ADD))) "SIGFAULT")
+(test/exn (machine (list (SUB))) "SIGFAULT")
+(test/exn (machine (list (CONST 1) (SUB))) "SIGFAULT")
+(test/exn (machine (list (CONST 1) (CONST 4) (SUB) (ADD))) "SIGFAULT")
+
 (test (machine (list (CLOSURE (list (ACCESS 1)
                                     (CONST 1)
                                     (ADD)
@@ -102,6 +125,8 @@
                      (CONST 2)
                      (APPLY)))
       (CONST 3))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;; Language definition
