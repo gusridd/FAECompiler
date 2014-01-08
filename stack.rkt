@@ -69,6 +69,15 @@
 (test (stack-to-list (EmptyStack)) '())
 (test (stack-to-list (Stacked 3 (Stacked 8 (Stacked 1 (EmptyStack))))) (list 3 8 1))
 
+;; list-to-stack :: List[V] -> Stack
+(defun (list-to-stack list)
+  (match list
+    ['() (EmptyStack)]
+    [(cons h t) (Stacked h (list-to-stack t))]))
+
+(test (list-to-stack '()) (EmptyStack))
+(test (list-to-stack (list 3 8 1)) (Stacked 3 (Stacked 8 (Stacked 1 (EmptyStack)))))
+
 ;; stack-debug :: Stack -> void
 (defun (stack-debug stack)
   (letrec ([collectString (λ(s)
