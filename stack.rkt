@@ -61,6 +61,13 @@
 (test (stack-size (Stacked 8 (Stacked 4 (EmptyStack)))) 2)
 
 ;; stack-to-list :: Stack -> List[V]
+(defun (stack-to-list stack)
+  (match stack
+    [(EmptyStack) '()]
+    [(Stacked v next) (cons v (stack-to-list next))]))
+
+(test (stack-to-list (EmptyStack)) '())
+(test (stack-to-list (Stacked 3 (Stacked 8 (Stacked 1 (EmptyStack))))) (list 3 8 1))
 
 ;; stack-debug :: Stack -> void
 (defun (stack-debug stack)
