@@ -66,14 +66,14 @@
                              (def (closureV cp ep) (stack-top (stack-pop stack)))
                              (def s (stack-pop (stack-pop stack)))
                              (run cp 
-                                  (list-to-stack (append tail env (stack-to-list s))) ;; esta rara la lista
+                                  (stack-push (stack-push s env) tail)
                                   (cons v ep))]
-    [(list (RETURN) tail ...) (def v (stack-top stack))
+    [(list (RETURN) tail ...) (def return-value (stack-top stack))
                               (def cp (stack-top (stack-pop stack)))
-                              (def ep (stack-to-list (stack-top (stack-pop (stack-pop stack)))))
+                              (def ep (stack-top (stack-pop (stack-pop stack))))
                               (def s (stack-pop (stack-pop (stack-pop stack))))
                               (run cp
-                                   (stack-push s v)
+                                   (stack-push s return-value)
                                    ep)]))
 
 (defun (machine ins-list)
