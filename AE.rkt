@@ -1,6 +1,6 @@
 #lang play
 
-(require "../stack.rkt")
+(require "stack.rkt")
 
 (print-only-errors #t)
 
