@@ -66,7 +66,7 @@
                              (def (closureV cp ep) (stack-top (stack-pop stack)))
                              (def s (stack-pop (stack-pop stack)))
                              (run cp 
-                                  (list-to-stack (append tail (cons env (stack-to-list s))))
+                                  (list-to-stack (append tail env (stack-to-list s))) ;; esta rara la lista
                                   (cons v ep))]
     [(list (RETURN) tail ...) (def v (stack-top stack))
                               (def cp (stack-top (stack-pop stack)))
