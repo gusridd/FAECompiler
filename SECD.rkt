@@ -42,43 +42,50 @@
 (defun (run ins-list stack env)
   ;(debug-run ins-list stack)
   (match ins-list
-    ['() (stack-top stack)]
-    [(list (CONST n) tail ...) 
-     (run tail (stack-push stack (CONST n)) env)]
-    [(list (ADD) tail ...) (def (CONST n1) (stack-top stack))
-                           (def (CONST n2) (stack-top (stack-pop stack)))
-                           (def new-stack (stack-pop (stack-pop stack)))
-                           (run tail (stack-push new-stack (CONST (+ n2 n1))) env)]
-    [(list (SUB) tail ...) (def (CONST n1) (stack-top stack))
-                           (def (CONST n2) (stack-top (stack-pop stack)))
-                           (def new-stack (stack-pop (stack-pop stack)))
-                           (run tail (stack-push new-stack (CONST (- n2 n1))) env)]
-    
-    [(list (ACCESS n) tail ...) (run tail 
-                                     (stack-push stack (list-ref env (- n 1))) 
-                                     env)]
-    [(list (LET) tail ...) (run tail 
-                                (stack-pop stack) 
-                                (cons (stack-top stack) env))]
-    [(list (ENDLET) tail ...) (run tail
-                                   stack
-                                   (drop 1 env))]
-    [(list (CLOSURE cp) tail ...) (run tail
-                                       (stack-push stack (closureV cp env))
-                                       env)]
-    [(list (APPLY) tail ...) (def v (stack-top stack))
-                             (def (closureV cp ep) (stack-top (stack-pop stack)))
-                             (def s (stack-pop (stack-pop stack)))
-                             (run cp 
-                                  (stack-push (stack-push s env) tail)
-                                  (cons v ep))]
-    [(list (RETURN) tail ...) (def return-value (stack-top stack))
-                              (def cp (stack-top (stack-pop stack)))
-                              (def ep (stack-top (stack-pop (stack-pop stack))))
-                              (def s (stack-pop (stack-pop (stack-pop stack))))
-                              (run cp
-                                   (stack-push s return-value)
-                                   ep)]))
+    ['() (if (= 1 (stack-size stack))
+             (stack-top stack)
+             (error "CORRUPT_ENDING_STATE"))]
+    [_ (let ([non-local-exn? (λ(ex) (not (string=? (exn-message ex) 
+                                                   "CORRUPT_ENDING_STATE")))]
+             [fault (λ(ex) (error "SIGFAULT"))])
+         (with-handlers ([non-local-exn? fault])
+           (match ins-list
+             [(list (CONST n) tail ...) 
+              (run tail (stack-push stack (CONST n)) env)]
+             [(list (ADD) tail ...) (def (CONST n1) (stack-top stack))
+                                    (def (CONST n2) (stack-top (stack-pop stack)))
+                                    (def new-stack (stack-pop (stack-pop stack)))
+                                    (run tail (stack-push new-stack (CONST (+ n2 n1))) env)]
+             [(list (SUB) tail ...) (def (CONST n1) (stack-top stack))
+                                    (def (CONST n2) (stack-top (stack-pop stack)))
+                                    (def new-stack (stack-pop (stack-pop stack)))
+                                    (run tail (stack-push new-stack (CONST (- n2 n1))) env)]
+             
+             [(list (ACCESS n) tail ...) (run tail 
+                                              (stack-push stack (list-ref env (- n 1))) 
+                                              env)]
+             [(list (LET) tail ...) (run tail 
+                                         (stack-pop stack) 
+                                         (cons (stack-top stack) env))]
+             [(list (ENDLET) tail ...) (run tail
+                                            stack
+                                            (drop 1 env))]
+             [(list (CLOSURE cp) tail ...) (run tail
+                                                (stack-push stack (closureV cp env))
+                                                env)]
+             [(list (APPLY) tail ...) (def v (stack-top stack))
+                                      (def (closureV cp ep) (stack-top (stack-pop stack)))
+                                      (def s (stack-pop (stack-pop stack)))
+                                      (run cp 
+                                           (stack-push (stack-push s env) tail)
+                                           (cons v ep))]
+             [(list (RETURN) tail ...) (def return-value (stack-top stack))
+                                       (def cp (stack-top (stack-pop stack)))
+                                       (def ep (stack-top (stack-pop (stack-pop stack))))
+                                       (def s (stack-pop (stack-pop (stack-pop stack))))
+                                       (run cp
+                                            (stack-push s return-value)
+                                            ep)])))]))
 
 (defun (machine ins-list)
   (run ins-list (stack-init) '()))
@@ -126,6 +133,11 @@
                      (APPLY)))
       (CONST 3))
 
+(test (machine (list (CLOSURE (list (ACCESS 1) (CONST 1) (APPLY) (RETURN))) 
+                     (CLOSURE (list (ACCESS 1) (CONST 1) (ADD) (RETURN))) 
+                     (APPLY))) 
+      (CONST 2))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -142,6 +154,7 @@
   (add l r)
   (sub l r)
   (id s)
+  (with a b)
   (app fun-expr arg-expr)
   (fun id body))
 
@@ -157,6 +170,7 @@
     [(? symbol?) (id s-expr)]
     [(list '+ l r) (add (parse l) (parse r))]
     [(list '- l r) (sub (parse l) (parse r))]
+    [(list 'with a 'in b) (with (parse a) (parse b))]
     [(list 'fun (list x) b) (fun x (parse b))]
     [(list f a) (app (parse f) (parse a))]))
 
@@ -210,15 +224,12 @@
                      [(num n) (list (CONST n))]
                      [(add l r) (append (comp l) (comp r) (list (ADD)))]
                      [(sub l r) (append (comp l) (comp r) (list (SUB)))]
+                     [(with a b) (append (comp a) (list (LET)) (comp b) (list (ENDLET)))]
                      [(app a b) (append (comp a) (comp b) (list (APPLY)))]
                      [(fun id body) (list (CLOSURE (append (comp body) (list (RETURN)))))]
                      [(brujinFun body) (list (CLOSURE (append (comp body) (list (RETURN)))))]
-                     [(brujinNumber n) (list (ACCESS n))]
-                     ))])
+                     [(brujinNumber n) (list (ACCESS n))]))])
     (comp e)))
-
-
-
 
 (test (compile '3)
       (list (CONST 3)))
@@ -246,6 +257,11 @@
                            (ADD)
                            (RETURN)))
             (CONST 2)
+            (APPLY)))
+
+(test (compile '{{fun {f} {f 1}} {fun {x} {+ x 1}}})
+      (list (CLOSURE (list (ACCESS 1) (CONST 1) (APPLY) (RETURN))) 
+            (CLOSURE (list (ACCESS 1) (CONST 1) (ADD) (RETURN))) 
             (APPLY)))
 
 
