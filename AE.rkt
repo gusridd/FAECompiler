@@ -34,20 +34,20 @@
       ['() (if (= 1 (stack-size stack))
                (stack-top stack)
                (error "CORRUPT_ENDING_STATE"))]
-      [(list (CONST n) tail-instructions ...)
-       (run tail-instructions (stack-push stack (CONST n)))]
-      [(list (ADD) tail-instructions ...)
+      [(list (CONST n) tail ...)
+       (run tail (stack-push stack (CONST n)))]
+      [(list (ADD) tail ...)
        (with-handlers ([non-local-exn? fault])
          (def (CONST n1) (stack-top stack))
          (def (CONST n2) (stack-top (stack-pop stack)))
          (def new-stack (stack-pop (stack-pop stack)))
-         (run tail-instructions (stack-push new-stack (CONST (+ n2 n1)))))]
-      [(list (SUB) tail-instructions ...)
+         (run tail (stack-push new-stack (CONST (+ n2 n1)))))]
+      [(list (SUB) tail ...)
        (with-handlers ([non-local-exn? fault])
          (def (CONST n1) (stack-top stack))
          (def (CONST n2) (stack-top (stack-pop stack)))
          (def new-stack (stack-pop (stack-pop stack)))
-         (run tail-instructions (stack-push new-stack (CONST (- n2 n1)))))])))
+         (run tail (stack-push new-stack (CONST (- n2 n1)))))])))
 
 (test (run (list (CONST 5)) 
            (stack-init))
