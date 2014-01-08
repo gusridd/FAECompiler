@@ -29,7 +29,7 @@
   (brujinFun body)
   (brujinNumber n))
 
-;; run :: List[Instruction], List[Instructions] -> CONST
+;; run :: List[Instruction], Stack[Instructions], List -> CONST
 (defun (run ins-list stack env)
   #;(begin
       (display "\ninstructions\n")
@@ -38,46 +38,46 @@
       (print stack)
       )
   (match ins-list
-    ['() (first stack)]
+    ['() (stack-top stack)]
     [(list (CONST n) tail ...) 
-     (run tail (cons (CONST n) stack) env)]
-    [(list (ADD) tail ...) (def (CONST n1) (first stack))
-                                        (def (CONST n2) (second stack))
-                                        (def new-stack (drop stack 2))
-                                        (run tail (cons (CONST (+ n2 n1)) new-stack) env)]
-    [(list (SUB) tail ...) (def (CONST n1) (first stack))
-                                        (def (CONST n2) (second stack))
-                                        (def new-stack (drop stack 2))
-                                        (run tail (cons (CONST (- n2 n1)) new-stack) env)]
+     (run tail (stack-push stack (CONST n)) env)]
+    [(list (ADD) tail ...) (def (CONST n1) (stack-top stack))
+                           (def (CONST n2) (stack-top (stack-pop stack)))
+                           (def new-stack (stack-pop (stack-pop stack)))
+                           (run tail (stack-push new-stack (CONST (+ n2 n1))) env)]
+    [(list (SUB) tail ...) (def (CONST n1) (stack-top stack))
+                           (def (CONST n2) (stack-top (stack-pop stack)))
+                           (def new-stack (stack-pop (stack-pop stack)))
+                           (run tail (stack-push new-stack (CONST (- n2 n1))) env)]
     
     [(list (ACCESS n) tail ...) (run tail 
-                                                  (cons (list-ref env (- n 1)) stack) 
-                                                  env)]
+                                     (stack-push stack (list-ref env (- n 1))) 
+                                     env)]
     [(list (LET) tail ...) (run tail 
-                                             (drop stack 1) 
-                                             (cons (first stack) env))]
+                                (stack-pop stack) 
+                                (cons (stack-top stack) env))]
     [(list (ENDLET) tail ...) (run tail
-                                                stack
-                                                (drop 1 env))]
+                                   stack
+                                   (drop 1 env))]
     [(list (CLOSURE cp) tail ...) (run tail
-                                                    (cons (closureV cp env) stack)
-                                                    env)]
-    [(list (APPLY) tail ...) (def v (first stack))
-                                          (def (closureV cp ep) (second stack))
-                                          (def s (drop stack 2))
-                                          (run cp 
-                                               (append tail (cons env (cons s '())))
-                                               (cons v ep))]
-    [(list (RETURN) tail ...) (def v (first stack))
-                                           (def cp (second stack))
-                                           (def ep (third stack))
-                                           (def s (drop stack 3))
-                                           (run cp
-                                                (cons v s)
-                                                ep)]))
+                                       (stack-push stack (closureV cp env))
+                                       env)]
+    [(list (APPLY) tail ...) (def v (stack-top stack))
+                             (def (closureV cp ep) (stack-top (stack-pop stack)))
+                             (def s (stack-pop (stack-pop stack)))
+                             (run cp 
+                                  (list-to-stack (append tail (cons env (stack-to-list s))))
+                                  (cons v ep))]
+    [(list (RETURN) tail ...) (def v (stack-top stack))
+                              (def cp (stack-top (stack-pop stack)))
+                              (def ep (stack-to-list (stack-top (stack-pop (stack-pop stack)))))
+                              (def s (stack-pop (stack-pop (stack-pop stack))))
+                              (run cp
+                                   (stack-push s v)
+                                   ep)]))
 
 (defun (machine ins-list)
-  (run ins-list '() '()))
+  (run ins-list (stack-init) '()))
 
 
 (test (machine (list (CONST 5)))
