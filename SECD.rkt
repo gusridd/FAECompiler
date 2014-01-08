@@ -29,14 +29,6 @@
   (brujinFun body)
   (brujinNumber n))
 
-
-(defun (n-th list pos)
-  (last (take list pos)))
-
-(test (n-th (list 3 4 5) 1) 3)
-(test (n-th (list 3 4 5) 2) 4)
-(test (n-th (list 3 4 5) 3) 5)
-
 ;; run :: List[Instruction], List[Instructions] -> CONST
 (defun (run ins-list stack env)
   #;(begin
@@ -59,30 +51,30 @@
                                         (run tail-instructions (cons (CONST (- n2 n1)) new-stack) env)]
     
     [(list (ACCESS n) tail-instructions ...) (run tail-instructions 
-                                                      (cons (n-th env n) stack) 
-                                                      env)]
+                                                  (cons (list-ref env (- n 1)) stack) 
+                                                  env)]
     [(list (LET) tail-instructions ...) (run tail-instructions 
-                                                 (drop stack 1) 
-                                                 (cons (first stack) env))]
+                                             (drop stack 1) 
+                                             (cons (first stack) env))]
     [(list (ENDLET) tail-instructions ...) (run tail-instructions
-                                                    stack
-                                                    (drop 1 env))]
+                                                stack
+                                                (drop 1 env))]
     [(list (CLOSURE cp) tail-instructions ...) (run tail-instructions
-                                                        (cons (closureV cp env) stack)
-                                                        env)]
+                                                    (cons (closureV cp env) stack)
+                                                    env)]
     [(list (APPLY) tail-instructions ...) (def v (first stack))
                                           (def (closureV cp ep) (second stack))
                                           (def s (drop stack 2))
                                           (run cp 
-                                                   (append tail-instructions (cons env (cons s '())))
-                                                   (cons v ep))]
+                                               (append tail-instructions (cons env (cons s '())))
+                                               (cons v ep))]
     [(list (RETURN) tail-instructions ...) (def v (first stack))
                                            (def cp (second stack))
                                            (def ep (third stack))
                                            (def s (drop stack 3))
                                            (run cp
-                                                    (cons v s)
-                                                    ep)]))
+                                                (cons v s)
+                                                ep)]))
 
 (defun (machine ins-list)
   (run ins-list '() '()))
