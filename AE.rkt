@@ -144,6 +144,23 @@
             (SUB)))
 
 
+(defun (spim-compile ins-list)
+  (let ([print-constants (foldr (λ(x y) (string-append x "\n" y)) 
+                                "" 
+                                (map (λ(c) (let ([num (~a (CONST-n c))])
+                                             (string-append "int" num ":\t.word\t" num "\n"))) 
+                                     (filter (λ(e)(CONST? e)) ins-list)))])
+    (display (string-append "\t\t.data\n"
+                   print-constants
+                   "\n\t\t.text\nmain:\n"
+                   ))))
+
+(spim-compile (list (CONST 5)
+                    (CONST 1)
+                    (CONST 2)
+                    (ADD)
+                    (SUB)))
+
 
 
 
