@@ -183,20 +183,24 @@
                                              "sub $t2, $t1, $t0"
                                              "sw $t2, 0($sp)"
                                              ))]))])
-    (display (string-append "\t\t.data\n"
-                            constants
-                            "\n\t\t.text\nmain:\n"
-                            (foldr (λ(x y) (string-append x "\n" y)) 
-                                   ""
-                                   (map comp ins-list))
-                            ending
-                            ))))
+    (string-append "\t\t.data\n"
+                   constants
+                   "\n\t\t.text\nmain:\n"
+                   (foldr (λ(x y) (string-append x "\n" y)) 
+                          ""
+                          (map comp ins-list))
+                   ending
+                   )))
 
-(spim-compile (list (CONST 5)
-                    (CONST 1)
-                    (CONST 2)
-                    (ADD)
-                    (SUB)))
+(defun (spim-compile-to-file s-expr filename)
+  (display-to-file (spim-compile (compile (parse s-expr)))
+                   filename
+                   #:mode 'text
+                   #:exists 'replace))
+
+(spim-compile-to-file '{- {+ 2 3} 1} "compiled.s")
+
+
 
 
 
