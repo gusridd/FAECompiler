@@ -14,10 +14,12 @@
   (SUB)
   (ACCESS n)
   (CLOSURE c)
+  (BRANCH exprs)
   (LET)
   (ENDLET)
   (APPLY)
-  (RETURN))
+  (RETURN)
+  (IF0))
 
 ;; values
 (deftype Val
@@ -62,7 +64,16 @@
                                     (def (CONST n2) (stack-top (stack-pop stack)))
                                     (def new-stack (stack-pop (stack-pop stack)))
                                     (run tail (stack-push new-stack (CONST (- n2 n1))) env)]
-             
+             [(list (BRANCH exprs) tail ...) (run tail
+                                                  (stack-push stack exprs)
+                                                  env)]
+             [(list (IF0) tail ...) (def (CONST c) (stack-top stack))
+                                    (def t-branch (stack-top (stack-pop stack)))
+                                    (def f-branch (stack-top (stack-pop (stack-pop stack))))
+                                    (def new-stack (stack-pop (stack-pop (stack-pop stack))))
+                                    (if (= 0 c)
+                                        (run (append t-branch tail) new-stack env)
+                                        (run (append f-branch tail) new-stack env))]
              [(list (ACCESS n) tail ...) (run tail 
                                               (stack-push stack (list-ref env (- n 1))) 
                                               env)]
@@ -114,6 +125,39 @@
                      (ENDLET)))
       (CONST 3))
 
+(test (machine (list (BRANCH (list (CONST 2))) 
+                     (BRANCH (list (CONST 1))) 
+                     (CONST 0) 
+                     (IF0)))
+      (CONST 1))
+
+(test (machine (list (BRANCH (list (CONST 2))) 
+                     (BRANCH (list (CONST 1))) 
+                     (CONST 9) 
+                     (IF0)))
+      (CONST 2))
+
+(test (machine (list
+                (CLOSURE
+                 (list
+                  (CLOSURE
+                   (list
+                    (CLOSURE
+                     (list
+                      (BRANCH (list (ACCESS 2)))
+                      (BRANCH (list (ACCESS 3)))
+                      (ACCESS 1)
+                      (IF0)
+                      (RETURN)))
+                    (RETURN)))
+                  (RETURN)))
+                (CONST 1)
+                (APPLY)
+                (CONST 2)
+                (APPLY)
+                (CONST 0)
+                (APPLY)))
+      (CONST 1))
 
 
 (test/exn (machine (list (CONST 5)
@@ -183,6 +227,7 @@
   (num n)
   (add l r)
   (sub l r)
+  (if0 c t f)
   (id s)
   (with a b)
   (acc n)
@@ -196,6 +241,9 @@
     [(? symbol?) (id s-expr)]
     [(list '+ l r) (add (parse l) (parse r))]
     [(list '- l r) (sub (parse l) (parse r))]
+    [(list 'if0 c t f) (if0 (parse c)
+                            (parse t)
+                            (parse f))]
     [(list 'with a 'in b) (with (parse a) (parse b))]
     [(list 'acc n) (acc n)]
     [(list 'fun (list x) b) (fun x (parse b))]
@@ -212,6 +260,9 @@
                                       (id x))]
                           [(add l r) (add (auxBruijn l bid lvl) (auxBruijn r bid lvl))]
                           [(sub l r) (sub (auxBruijn l bid lvl) (auxBruijn r bid lvl))]
+                          [(if0 c t f) (if0 (auxBruijn c bid lvl)
+                                            (auxBruijn t bid lvl)
+                                            (auxBruijn f bid lvl))]
                           [(app a b) (app (auxBruijn a bid lvl) (auxBruijn b bid lvl))]
                           [(fun id body) (if (eq? id bid)
                                              (deBruijn (fun id body))
@@ -225,6 +276,9 @@
       [(id x) (id x)]
       [(add l r) (add (deBruijn l) (deBruijn r))]
       [(sub l r) (sub (deBruijn l) (deBruijn r))]
+      [(if0 c t f) (if0 (deBruijn c)
+                        (deBruijn t)
+                        (deBruijn f))]
       [(with a b) (with (deBruijn a) (deBruijn b))]
       [(app a b) (app (deBruijn a) (deBruijn b))]
       [(fun id body) (bruijnFun (auxBruijn body id 1))])))
@@ -261,6 +315,10 @@
                      [(acc n) (list (ACCESS n))]
                      [(add l r) (append (comp l) (comp r) (list (ADD)))]
                      [(sub l r) (append (comp l) (comp r) (list (SUB)))]
+                     [(if0 c t f) (append (list (BRANCH (comp f)))
+                                          (list (BRANCH (comp t)))
+                                          (comp c)
+                                          (list (IF0)))]
                      [(with a b) (append (comp a) (list (LET)) (comp b) (list (ENDLET)))]
                      [(app a b) (append (comp a) (comp b) (list (APPLY)))]
                      [(fun id body) (list (CLOSURE (append (comp body) (list (RETURN)))))]
