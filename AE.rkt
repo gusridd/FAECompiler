@@ -144,6 +144,60 @@
             (SUB)))
 
 
+(defun (spim-compile ins-list)
+  (letrec ([unique (λ(l) (if (or (= 0 (length l)) (= 1 (length l)))
+                             l
+                             (if (eq? (CONST-n (first l)) (CONST-n(second l)))
+                                 (unique (rest l))
+                                 (cons (first l) (unique (rest l))))))]
+           [inline (λ(l) (apply string-append (map (λ(s) (string-append "\t" s "\n")) 
+                                                   l)))]
+           [constants (apply string-append
+                             (map (λ(c) (let ([num (~a (CONST-n c))])
+                                          (string-append "int" num ":\t.word\t" num "\n"))) 
+                                  (unique (sort (filter (λ(e)(CONST? e)) ins-list)
+                                                (λ(x y) (< (CONST-n x) (CONST-n y)))))))]
+           [ending (inline (list "li\t$v0, 1"
+                                 "lw\t$a0, 0($sp)"
+                                 "syscall"
+                                 "li\t$v0, 10"
+                                 "syscall"
+                                 ))]
+           [comp (λ(e)(match e
+                        [(CONST n) (inline (list (string-append "# (CONST " (~a n) ")")
+                                                 "addi $sp, $sp, -4"
+                                                 (string-append "lw $t0, int" (~a n))
+                                                 "sw $t0, 0($sp)"
+                                                 ))]
+                        [(ADD) (inline (list "# (ADD)"
+                                             "lw $t0, 0($sp)"
+                                             "addi $sp, $sp, 4"
+                                             "lw $t1, 0($sp)"
+                                             "add $t2, $t1, $t0"
+                                             "sw $t2, 0($sp)"
+                                             ))]
+                        [(SUB) (inline (list "# (SUB)"
+                                             "lw $t0, 0($sp)"
+                                             "addi $sp, $sp, 4"
+                                             "lw $t1, 0($sp)"
+                                             "sub $t2, $t1, $t0"
+                                             "sw $t2, 0($sp)"
+                                             ))]))])
+    (display (string-append "\t\t.data\n"
+                            constants
+                            "\n\t\t.text\nmain:\n"
+                            (foldr (λ(x y) (string-append x "\n" y)) 
+                                   ""
+                                   (map comp ins-list))
+                            ending
+                            ))))
+
+(spim-compile (list (CONST 5)
+                    (CONST 1)
+                    (CONST 2)
+                    (ADD)
+                    (SUB)))
+
 
 
 
