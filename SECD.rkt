@@ -436,6 +436,8 @@
                                            "sw $t3, 0($sp) \t\t# sp[0] = t3"
                                            "j copyEnv"
                                            ))]
+           [control_hack (inline (list "\ncontrol_hack:"
+                                       "jr $t1"))]
            
            [ending (inline (list "li\t$v0, 1"
                                  "lw\t$a0, 0($sp)"
@@ -452,7 +454,7 @@
                                                  ))]
                         [(CLOSURE_CONST n) (inline (list (string-append "# (CLOSURE_CONST " (~a n) ")")
                                                          "addi $sp, $sp, -4"
-                                                         (string-append "lw $t0, " (~a n))
+                                                         (string-append "la $t0, " (~a n))
                                                          "sw $t0, 0($sp)"
                                                          ))]
                         [(ADD) (inline (list "# (ADD)"
@@ -480,15 +482,30 @@
                                                "addi $sp, $sp, -4"
                                                "lw $t8, 0($sp) \t\t# argument for copyEnv"
                                                "jal copyEnv"
+                                               "addi $t3, $t8, 2"
+                                               "li $t1, 4"
+                                               "mult $t3, $t1"
+                                               "mflo $t3 \t\t# t3 = t3 * 4 (alignment)"
+                                               "sub $t3, $sp, $t3"
+                                               "addi $sp, $sp, 8"
+                                               "sw $sp, ($t3) \t\t# save old stack pointer"
+                                               "addi $t3, $t3, -4"
+                                               "sw $fp, ($t3) \t\t# save old frame pointer"
+                                               "addi $t3, $t3, -4"
+                                               "sw $ra, ($t3) \t\t# save return address"
                                                "lw $t1, 0($sp) \t\t# function location into $t1"
-                                               "jal $t1"))]
+                                               "addiu $t3, $t3, -4 \t# position t3 at new stack position"
+                                               "move $sp, $t3 \t\t# move the stack to the new stack position"
+                                               "jal $t1 \t\t# call function"))]
                         [(RETURN) (inline (list ""
                                                 "# (RETURN)"
                                                 "addi $t8, $t8, -1 \t# env-size - 1"
                                                 "jr	$ra"))]))] 
            [funDefs (inline (hash-map replacedClosureHash
-                                      (λ(k v) (string-append "\n" v ":\n\t" 
-                                                             "addi $t8, $t8, 1 \t# env-size + 1"
+                                      (λ(k v) (string-append "\n" v ": # label for "
+                                                             v
+                                                             "\n\t" 
+                                                             "addi $t8, $t8, 1 \t# env-size + 1\n"
                                                              (apply string-append (map comp (CLOSURE-ins k)))
                                                              ))
                                       
@@ -496,9 +513,11 @@
     (string-append "\t\t.data\n"
                    constants
                    "\n\t\t.text\n"
+                   control_hack
                    copyEnvPrimivite
                    funDefs
                    "main:\n"
+                   "\tsub $fp, $sp, 4\n"
                    (foldr (λ(x y) (string-append x "\n" y)) 
                           ""
                           (map comp (replaceClosures ins-list)))
