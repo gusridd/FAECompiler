@@ -376,6 +376,10 @@
 ;; 8($fp) -> env[0] (new-arg)
 ;; 12($fp) -> env[1]
 
+;; $t9  -> old stack pointer  ($sp)
+;; $t10 -> old frame pointer  ($fp)
+;; $t11 -> old return address ($ra)
+
 ;; rules
 ;; before function aplication the environment must be copied into the stack, save the frame pointer to the top and the new parameter be placed at top. Refresh the fp and the sp
 
@@ -494,11 +498,21 @@
                                                "addi $t3, $t3, -4"
                                                "sw $ra, ($t3) \t\t# save return address"
                                                "lw $t1, 0($sp) \t\t# function location into $t1"
-                                               "addiu $t3, $t3, -4 \t# position t3 at new stack position"
                                                "move $sp, $t3 \t\t# move the stack to the new stack position"
+                                               "addi $fp, $sp, 4 \t\t# refresh frame pointer (below stack)"
+                                               "addiu $t3, $t3, -4 \t# position t3 at new stack position"
                                                "jal $t1 \t\t# call function"))]
                         [(RETURN) (inline (list ""
                                                 "# (RETURN)"
+                                                "lw $t0, 0($sp) \t\t# return value into $t0"
+                                                "lw $t11, 0($fp) \t\t# restore old return address to t11"
+                                                "lw $t11, 4($fp) \t\t# restore old frame pointer to t10"
+                                                "lw $t11, 8($fp) \t\t# restore old stack pointer to t9"
+                                                "addi $t3, $t8, 7"
+                                                "li $t1, 4"
+                                                "mult $t3, $t1"
+                                                "mflo $t3 \t\t# t3 = t3 * 4 (alignment)"
+                                                "sw $t0, ($t3)"
                                                 "addi $t8, $t8, -1 \t# env-size - 1"
                                                 "jr	$ra"))]))] 
            [funDefs (inline (hash-map replacedClosureHash
