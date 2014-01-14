@@ -372,6 +372,9 @@
 ;; 8($fp) -> env[0] (new-arg)
 ;; 12($fp) -> env[1]
 
+;; rules
+;; before function aplication the environment must be copied into the stack, save the frame pointer to the top and the new parameter be placed at top. Refresh the fp and the sp
+
 
 (defun (spim-compile ins-list)
   (letrec ([inline (λ(l) (apply string-append (map (λ(s) (string-append "\t" s "\n")) 
@@ -456,6 +459,8 @@
                                     "mfhi $t3 \t# t3 = t3 * 4 (alignment)"
                                     "sw $t0, $t3($sp) \t# sp[t3] = t0"
                                     "addi $sp, $sp, 4"
+                                    "lw $t2, 0($sp) \t# argument for copyEnv"
+                                    "j copyEnv"
                                     "lw $t1, 0($sp) #function location into $t1"
                                     "jal $t1"))]
              [(RETURN) (inline (list ""
