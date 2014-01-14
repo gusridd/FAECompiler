@@ -365,8 +365,12 @@
 ;;
 ;; $t0 -> first parameter
 ;; $t1 -> second parameter
-;; $t2 -> environment length (each time a function is called is incremented by one)
+
 ;; $t3 -> temp usage
+;; $t4 -> temp usage
+
+;; $t8 -> environment length (each time a function is called is incremented by one)
+
 ;; 0($fp) -> return address
 ;; 4($fp) -> old frame pointer 
 ;; 8($fp) -> env[0] (new-arg)
@@ -380,16 +384,16 @@
   (letrec ([inline (λ(l) (apply string-append (map (λ(s) (string-append "\t" s "\n")) 
                                                    l)))]
            #;[constants (apply string-append
-                             (map (λ(c) (let ([num (~a (CONST-n c))])
-                                          (string-append "int" num ":\t.word\t" num "\n"))) 
-                                  (remove-duplicates (filter (λ(e)(CONST? e)) ins-list))))]
-           [q (display (collectClosures ins-list))]
-           [o (display "\n")]
+                               (map (λ(c) (let ([num (~a (CONST-n c))])
+                                            (string-append "int" num ":\t.word\t" num "\n"))) 
+                                    (remove-duplicates (filter (λ(e)(CONST? e)) ins-list))))]
+           ;[q (display (collectClosures ins-list))]
+           ;[o (display "\n")]
            [closureHash (make-hash (i-map (λ(e i) 
                                             (cons e (string-append "fun" (~a i)))) 
                                           (collectClosures ins-list)))]
-           [b (display closureHash)]
-           [c (display "\n")]
+           ;[b (display closureHash)]
+           ;[c (display "\n")]
            [replaceClosures (λ(l) (map (λ(e) (match e
                                                [(CLOSURE ins) (CLOSURE_CONST (hash-ref closureHash e))]
                                                [_ e])) l))]
@@ -401,97 +405,114 @@
                              (map (λ(c) (let ([num (~a (CONST-n c))])
                                           (string-append "int" num ":\t.word\t" num "\n")))
                                   (remove-duplicates (append (filter (λ(e)(CONST? e)) ins-list)
-                                                 (apply append (hash-map replacedClosureHash
-                                                                         (λ(k v)
-                                                                           (match k
-                                                                             [(CLOSURE ins) (filter CONST? ins)]))))))))]
-[g (display replacedClosureHash)]
-[s (display "\n")]
-[copyEnvPrimivite (inline (list "\ncopyEnv:"
-                                "lw $t1, 0($sp)"
-                                "addi $t3, $t1, 1 \t# t3 = t1 + 1"
-                                "mult $t3,4"
-                                "mfhi $t3 \t# t3 = t3 * 4 (alignment)"
-                                "sw $t3($fp), 0($sp) \t# sp[0] = fp[t3]"
-                                "addi $sp, $sp, -4"
-                                "beq $t1, $0, 0($fp)\t# if(t1 == 0) return"
-                                "addi $t3, $t1, -1 \t# t3 = t1 - 1"
-                                "sw $t3, 0($sp)\t #sp[0] = t3"
-                                "j copyEnv"
-                                ))]
-
-[ending (inline (list "li\t$v0, 1"
-                      "lw\t$a0, 0($sp)"
-                      "syscall"
-                      "li\t$v0, 10"
-                      "syscall"
-                      ))]
-;[a (display funDefs)]
-[comp (λ(e)(match e
-             [(CONST n) (inline (list (string-append "# (CONST " (~a n) ")")
-                                      "addi $sp, $sp, -4"
-                                      (string-append "lw $t0, int" (~a n))
-                                      "sw $t0, 0($sp)"
-                                      ))]
-             [(CLOSURE_CONST n) (inline (list (string-append "# (CLOSURE_CONST " (~a n) ")")
-                                              "addi $sp, $sp, -4"
-                                              (string-append "lw $t0, " (~a n))
-                                              "sw $t0, 0($sp)"
-                                              ))]
-             [(ADD) (inline (list "# (ADD)"
-                                  "lw $t0, 0($sp)"
-                                  "addi $sp, $sp, 4"
-                                  "lw $t1, 0($sp)"
-                                  "add $t1, $t1, $t0"
-                                  "sw $t1, 0($sp)"
-                                  ))]
-             [(SUB) (inline (list "# (SUB)"
-                                  "lw $t0, 0($sp)"
-                                  "addi $sp, $sp, 4"
-                                  "lw $t1, 0($sp)"
-                                  "sub $t1, $t1, $t0"
-                                  "sw $t1, 0($sp)"
-                                  ))]
-             [(APPLY) (inline (list "# (APPLY)"
-                                    "lw $t0, 0($sp) # argument into $t0"
-                                    "addi $t3,$t2,1 \t # t3 = env-size + 1"
-                                    "mult $t3,4"
-                                    "mfhi $t3 \t# t3 = t3 * 4 (alignment)"
-                                    "sw $t0, $t3($sp) \t# sp[t3] = t0"
-                                    "addi $sp, $sp, 4"
-                                    "lw $t2, 0($sp) \t# argument for copyEnv"
-                                    "j copyEnv"
-                                    "lw $t1, 0($sp) #function location into $t1"
-                                    "jal $t1"))]
-             [(RETURN) (inline (list ""
-                                     "# (RETURN)"
-                                     "addi $t2, $t2, -1 \t# env-size - 1"
-                                     "jr	$ra"))]))] 
-[funDefs (inline (hash-map replacedClosureHash
-                           (λ(k v) (string-append "\n" v ":\n\t" 
-                                                  "addi $t2, $t2, 1 \t# env-size + 1"
-                                                  (apply string-append (map comp (CLOSURE-ins k)))
-                                                  ))
-                           
-                           ))])
-(string-append "\t\t.data\n"
-               constants
-               "\n\t\t.text\n"
-               copyEnvPrimivite
-               funDefs
-               "main:\n"
-               (foldr (λ(x y) (string-append x "\n" y)) 
-                      ""
-                      (map comp (replaceClosures ins-list)))
-               ending
-               )))
+                                                             (apply append (hash-map replacedClosureHash
+                                                                                     (λ(k v)
+                                                                                       (match k
+                                                                                         [(CLOSURE ins) (filter CONST? ins)]))))))))]
+           ;[g (display replacedClosureHash)]
+           ;[s (display "\n")]
+           [copyEnvPrimivite (inline (list "\ncopyEnvReturn:"
+                                           "# lw $t0, 0($fp)"
+                                           "jr $ra"
+                                           ""
+                                           "\ncopyEnv: \t\t\t# after this call a zero must appear at 0($sp)"
+                                           "beq $t8, $0, copyEnvReturn \t# if env.size == 0 return"
+                                           "lw $t0, 0($sp)"
+                                           "addi $t3, $t0, 3 \t# t3 = t0 + 3 (for the old_fp and old_sp)"
+                                           "li $t1, 4"
+                                           "mult $t3,$t1"
+                                           "mflo $t3 \t\t# t3 = t3 * 4 (alignment)"
+                                           "add $t4, $t3, $fp"
+                                           "# sw ($t4), 0($sp) \t# sp[0] = fp[t3] ($t4 is positioned at env[arg])"
+                                           "sub $t5, $t8, $t0 \t# t5 = env-size - arg"
+                                           "mult $t5,$t1"
+                                           "mflo $t5 \t\t# t5 = t5 * 4 (alignment)"
+                                           "sub $t5, $sp, $t5"
+                                           "lw $t4, ($t4)"
+                                           "sw $t4, ($t5) \t# the actual copy"
+                                           "# addi $sp, $sp, -4 \t# (reposition the stack pointer)"
+                                           "beq $t0, $0, copyEnvReturn\t# if(t0 == 0) return"
+                                           "addi $t3, $t0, -1 \t# t3 = t0 - 1"
+                                           "sw $t3, 0($sp) \t\t# sp[0] = t3"
+                                           "j copyEnv"
+                                           ))]
+           
+           [ending (inline (list "li\t$v0, 1"
+                                 "lw\t$a0, 0($sp)"
+                                 "syscall"
+                                 "li\t$v0, 10"
+                                 "syscall"
+                                 ))]
+           ;[a (display funDefs)]
+           [comp (λ(e)(match e
+                        [(CONST n) (inline (list (string-append "# (CONST " (~a n) ")")
+                                                 "addi $sp, $sp, -4"
+                                                 (string-append "lw $t0, int" (~a n))
+                                                 "sw $t0, 0($sp)"
+                                                 ))]
+                        [(CLOSURE_CONST n) (inline (list (string-append "# (CLOSURE_CONST " (~a n) ")")
+                                                         "addi $sp, $sp, -4"
+                                                         (string-append "lw $t0, " (~a n))
+                                                         "sw $t0, 0($sp)"
+                                                         ))]
+                        [(ADD) (inline (list "# (ADD)"
+                                             "lw $t0, 0($sp)"
+                                             "addi $sp, $sp, 4"
+                                             "lw $t1, 0($sp)"
+                                             "add $t1, $t1, $t0"
+                                             "sw $t1, 0($sp)"
+                                             ))]
+                        [(SUB) (inline (list "# (SUB)"
+                                             "lw $t0, 0($sp)"
+                                             "addi $sp, $sp, 4"
+                                             "lw $t1, 0($sp)"
+                                             "sub $t1, $t1, $t0"
+                                             "sw $t1, 0($sp)"
+                                             ))]
+                        [(APPLY) (inline (list "# (APPLY)"
+                                               "lw $t0, 0($sp) \t\t# argument into $t0"
+                                               "addi $t3,$t8,2 \t\t# t3 = env-size + 2"
+                                               "li $t1, 4"
+                                               "mult $t3, $t1"
+                                               "mflo $t3 \t\t# t3 = t3 * 4 (alignment)"
+                                               "sub $t3, $sp, $t3"
+                                               "sw $t0, ($t3) \t\t# sp[t3] = t0"
+                                               "addi $sp, $sp, -4"
+                                               "lw $t8, 0($sp) \t\t# argument for copyEnv"
+                                               "jal copyEnv"
+                                               "lw $t1, 0($sp) \t\t# function location into $t1"
+                                               "jal $t1"))]
+                        [(RETURN) (inline (list ""
+                                                "# (RETURN)"
+                                                "addi $t8, $t8, -1 \t# env-size - 1"
+                                                "jr	$ra"))]))] 
+           [funDefs (inline (hash-map replacedClosureHash
+                                      (λ(k v) (string-append "\n" v ":\n\t" 
+                                                             "addi $t8, $t8, 1 \t# env-size + 1"
+                                                             (apply string-append (map comp (CLOSURE-ins k)))
+                                                             ))
+                                      
+                                      ))])
+    (string-append "\t\t.data\n"
+                   constants
+                   "\n\t\t.text\n"
+                   copyEnvPrimivite
+                   funDefs
+                   "main:\n"
+                   (foldr (λ(x y) (string-append x "\n" y)) 
+                          ""
+                          (map comp (replaceClosures ins-list)))
+                   ending
+                   )))
 
 (defun (spim-compile-to-file s-expr filename)
-  (display-to-file (spim-compile (compile (parse s-expr)))
+  (display-to-file (spim-compile (compile s-expr))
                    filename
                    #:mode 'text
                    #:exists 'replace))
 
 
-(display (spim-compile (compile '{{fun {x} {{fun {x} 2} 0}} 0})))
+(let ([prog '{{fun {x} 1} 0}])
+  (display (spim-compile (compile prog)))
+  (spim-compile-to-file prog "some.s"))
 
