@@ -10,10 +10,11 @@
 
 (deftype Instruction
   (CONST n)
+  (CLOSURE_CONST name)
   (ADD)
   (SUB)
   (ACCESS n)
-  (CLOSURE c)
+  (CLOSURE ins)
   (LET)
   (ENDLET)
   (APPLY)
@@ -325,4 +326,160 @@
        (ENDLET)))
 
 
+(defun (i-map fun list)
+  (letrec ([indexed (λ(l i)
+                      (match l
+                        ['() '()]
+                        [(cons h t) (cons (fun h i) (indexed t (+ 1 i)))]))])
+    (indexed list 1)))
+
+(test (i-map (λ(e i) i) (list)) (list))
+(test (i-map (λ(e i) i) (list 1 1 1 1 1 1 1)) (list 1 2 3 4 5 6 7))
+(test (i-map (λ(e i) (cons e i)) (list 1 1 1 1 1 1 1)) '((1 . 1) (1 . 2) (1 . 3) (1 . 4) (1 . 5) (1 . 6) (1 . 7)))
+
+
+;; collectClosures :: List[Expr] -> List[Closure]
+(defun (collectClosures l)
+  (apply append (map (λ(c) 
+                       (cons c (collectClosures (CLOSURE-ins c)))) 
+                     (filter CLOSURE? l))))
+
+
+(test (collectClosures (list (CLOSURE (list (CLOSURE (list (CONST 1) 
+                                                           (CONST 2) 
+                                                           (ADD) 
+                                                           (RETURN))) 
+                                            (RETURN))) 
+                             (CONST 3) 
+                             (APPLY)))
+      (list (CLOSURE (list (CLOSURE (list (CONST 1) 
+                                          (CONST 2) 
+                                          (ADD) 
+                                          (RETURN))) 
+                           (RETURN)))
+            (CLOSURE (list (CONST 1) 
+                           (CONST 2) 
+                           (ADD) 
+                           (RETURN)))))
+
+;;
+;; $t0 -> first parameter
+;; $t1 -> second parameter
+;; $t2 -> environment length (each time a function is called is incremented by one)
+;; $t3 -> temp usage
+;; 0($fp) -> return address
+;; 4($fp) -> old frame pointer 
+;; 8($fp) -> env[0] (new-arg)
+;; 12($fp) -> env[1]
+
+
+(defun (spim-compile ins-list)
+  (letrec ([inline (λ(l) (apply string-append (map (λ(s) (string-append "\t" s "\n")) 
+                                                   l)))]
+           [constants (apply string-append
+                             (map (λ(c) (let ([num (~a (CONST-n c))])
+                                          (string-append "int" num ":\t.word\t" num "\n"))) 
+                                  (remove-duplicates (filter (λ(e)(CONST? e)) ins-list))))]
+           [q (display (collectClosures ins-list))]
+           [o (display "\n")]
+           [closureHash (make-hash (i-map (λ(e i) 
+                                            (cons e (string-append "fun" (~a i)))) 
+                                          (collectClosures ins-list)))]
+           [b (display closureHash)]
+           [c (display "\n")]
+           [replaceClosures (λ(l) (map (λ(e) (match e
+                                               [(CLOSURE ins) (CLOSURE_CONST (hash-ref closureHash e))]
+                                               [_ e])) l))]
+           [replacedClosureHash (make-hash (hash-map closureHash 
+                                                     (λ(k v)
+                                                       (match k
+                                                         [(CLOSURE ins) (cons (CLOSURE (replaceClosures ins)) v)]))))]
+           
+           [g (display replacedClosureHash)]
+           [s (display "\n")]
+           [copyEnvPrimivite (inline (list "\ncopyEnv:"
+                                           "lw $t1, 0($sp)"
+                                           "addi $t3, $t1, 1 \t# t3 = t1 + 1"
+                                           "mult $t3,4"
+                                           "mfhi $t3 \t# t3 = t3 * 4 (alignment)"
+                                           "sw $t3($fp), 0($sp) \t# sp[0] = fp[t3]"
+                                           "addi $sp, $sp, -4"
+                                           "beq $t1, $0, 0($fp)\t# if(t1 == 0) return"
+                                           "addi $t3, $t1, -1 \t# t3 = t1 - 1"
+                                           "sw $t3, 0($sp)\t #sp[0] = t3"
+                                           "j copyEnv"
+                                           ))]
+           
+           [ending (inline (list "li\t$v0, 1"
+                                 "lw\t$a0, 0($sp)"
+                                 "syscall"
+                                 "li\t$v0, 10"
+                                 "syscall"
+                                 ))]
+           ;[a (display funDefs)]
+           [comp (λ(e)(match e
+                        [(CONST n) (inline (list (string-append "# (CONST " (~a n) ")")
+                                                 "addi $sp, $sp, -4"
+                                                 (string-append "lw $t0, int" (~a n))
+                                                 "sw $t0, 0($sp)"
+                                                 ))]
+                        [(CLOSURE_CONST n) (inline (list (string-append "# (CLOSURE_CONST " (~a n) ")")
+                                                         "addi $sp, $sp, -4"
+                                                         (string-append "lw $t0, " (~a n))
+                                                         "sw $t0, 0($sp)"
+                                                         ))]
+                        [(ADD) (inline (list "# (ADD)"
+                                             "lw $t0, 0($sp)"
+                                             "addi $sp, $sp, 4"
+                                             "lw $t1, 0($sp)"
+                                             "add $t1, $t1, $t0"
+                                             "sw $t1, 0($sp)"
+                                             ))]
+                        [(SUB) (inline (list "# (SUB)"
+                                             "lw $t0, 0($sp)"
+                                             "addi $sp, $sp, 4"
+                                             "lw $t1, 0($sp)"
+                                             "sub $t1, $t1, $t0"
+                                             "sw $t1, 0($sp)"
+                                             ))]
+                        [(APPLY) (inline (list "# (APPLY)"
+                                               "lw $t0, 0($sp) # argument into $t0"
+                                               "addi $t3,$t2,1 \t # t3 = env-size + 1"
+                                               "mult $t3,4"
+                                               "mfhi $t3 \t# t3 = t3 * 4 (alignment)"
+                                               "sw $t0, $t3($sp) \t# sp[t3] = t0"
+                                               "addi $sp, $sp, 4"
+                                               "lw $t1, 0($sp) #function location into $t1"
+                                               "jal $t1"))]
+                        [(RETURN) (inline (list ""
+                                                "# (RETURN)"
+                                                "addi $t2, $t2, -1 \t# env-size - 1"
+                                                "jr	$ra"))]))] 
+           [funDefs (inline (hash-map replacedClosureHash
+                                      (λ(k v) (string-append "\n" v ":\n\t" 
+                                                             "addi $t2, $t2, 1 \t# env-size + 1"
+                                                             (apply string-append (map comp (CLOSURE-ins k)))
+                                                             ))
+                                      
+                                      ))])
+    (string-append "\t\t.data\n"
+                   constants
+                   "\n\t\t.text\n"
+                   copyEnvPrimivite
+                   funDefs
+                   "main:\n"
+                   (foldr (λ(x y) (string-append x "\n" y)) 
+                          ""
+                          (map comp (replaceClosures ins-list)))
+                   ending
+                   )))
+
+(defun (spim-compile-to-file s-expr filename)
+  (display-to-file (spim-compile (compile (parse s-expr)))
+                   filename
+                   #:mode 'text
+                   #:exists 'replace))
+
+
+(display (spim-compile (compile '{{fun {x} {{fun {x} 2} 0}} 0})))
 
