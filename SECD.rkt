@@ -443,10 +443,13 @@
            [control_hack (inline (list "\ncontrol_hack:"
                                        "jr $t1"))]
            
-           [ending (inline (list "li\t$v0, 1"
-                                 "lw\t$a0, 0($sp)"
+           [ending (inline (list "li\t$v0, 1 \t\t# code 1 for print integer"
+                                 "lw\t$a0, 0($sp) \t# integer to print"
                                  "syscall"
-                                 "li\t$v0, 10"
+                                 "li\t$v0, 4 \t\t# code 4 for print string"
+                                 "la\t$a0, new_line \t# string to print"
+                                 "syscall"
+                                 "li\t$v0, 10 \t\t #code for exit"
                                  "syscall"
                                  ))]
            ;[a (display funDefs)]
@@ -461,7 +464,7 @@
                                                          (string-append "la $t0, " (~a n))
                                                          "sw $t0, 0($sp)"
                                                          ))]
-                        [(ACCESS n) (inline (list (string-append "# (ACCESS " (~a n) ")")
+                        [(ACCESS n) (inline (list (string-append "\n\t# (ACCESS " (~a n) ")")
                                                   "addi $sp, $sp, -4"
                                                   "li $t1, 2"
                                                   (string-append "addi $t0, $t1, " (~a n))
@@ -535,6 +538,7 @@
                                       
                                       ))])
     (string-append "\t\t.data\n"
+                   "new_line:\t.asciiz \"\\n\"\n"
                    constants
                    "\n\t\t.text\n"
                    control_hack
@@ -555,7 +559,7 @@
                    #:exists 'replace))
 
 
-(let ([prog '{{fun {x} x} 0}])
+(let ([prog '{{{fun {x} {fun {y} x}} 2} 1}])
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
 
