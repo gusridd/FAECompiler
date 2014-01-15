@@ -467,7 +467,7 @@
                                "addi $t3, $t3, 4"
                                "addi $t4, $t4, 4 \t# move both pointers one position"
                                "sub $t0, $t0, 1 \t# decrease env-counter"
-                               "j copy:"
+                               "j copy"
                                "\ncopyReturn:"
                                "jr $ra"
                                ""))]
@@ -487,7 +487,7 @@
                                                  (string-append "lw $t0, int" (~a n))
                                                  "sw $t0, 0($sp)"
                                                  "addi $sp, $sp, -4"
-                                                 "li $t0, 1"
+                                                 "li $t0, 2"
                                                  "sw $t0, 0($sp) \t# put the size of int"
                                                  ))]
                         [(CLOSURE_CONST n) (inline (list (string-append "# (CLOSURE_CONST " (~a n) ")")
@@ -499,7 +499,7 @@
                                                          "sw $t0, 0($sp)"
                                                          "addi $sp, $sp, -4"
                                                          "lw $t0, 12($fp)"
-                                                         "addiu $t0, $t0, 2"
+                                                         "addiu $t0, $t0, 3"
                                                          "sw $t0, 0($sp) \t\t# put the function size at top"
                                                          ))]
                         [(ACCESS n) (inline (list (string-append "\n\t# (ACCESS " (~a n) ")")
@@ -550,18 +550,17 @@
                                                "mult $t4, $t1"
                                                "mflo $t4 \t\t# t4 = t4 * 4 (alignment)"
                                                "sub $t4, $sp, $t4 \t# t4 aligned to copy arg"
-                                               "move $t5, $t4"
+                                               "move $t7, $t4"
                                                "# addi $t2, $t2, 1"
                                                "sw $t2, -4($t4) \t\t# new env-size positioned"
                                                "move $t3, $sp \t\t# t3 points to argument start"
                                                "jal copy"
                                                "# copy old frame values"
-                                               "sub $t5, $t5, 8"
-                                               "sw $sp, ($t5)"
-                                               "sw $fp, -4($t5)"
-                                               "sw $ra, -8($t5)"
-                                               "sub $t5, $t5, 8"
-                                               "move $sp, $t5"
+                                               "sw $sp, -8($t7)"
+                                               "sw $fp, -12($t7)"
+                                               "sw $ra, -16($t7)"
+                                               "sub $t7, $t7, 16"
+                                               "move $sp, $t7"
                                                "move $fp, $sp"
                                                "jal $t6 \t\t# call function"
                                                ))]
