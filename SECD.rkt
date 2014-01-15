@@ -440,11 +440,12 @@
                                               "mult $t3, $t1"
                                               "mflo $t3 \t\t# t3 = t3 * 4 (alignment)"
                                               "sub $t3, $sp, $t3 \t# t3 is the position for the env-size"
-                                              "sw $t0, ($t3)"
+                                              "# sw $t0, ($t3)"
                                               "move $sp, $t3"
                                               "addi $sp, $sp, -4 \t# position sp to receive function pointer"
-                                              "addi $t4, $t3, 4 \t# position t4 to receive the copy"
-                                              "addi $t3, $fp, 16 \t# position t3 to source the copy"
+                                              "move $t4, $t3 \t# position t4 to receive the copy"
+                                              "addi $t3, $fp, 12 \t# position t3 to source the copy"
+                                              "addi $t0, $t0, 1 \t# to copy the env-size"
                                               "\ncaptureEnvLoop:"
                                               "beq $t0, $0, captureEnvReturn \t# if(env-counter == 0) return"
                                               "lw $t5, ($t3)"
@@ -456,8 +457,22 @@
                                               "\ncaptureEnvReturn:"
                                               "jr $ra"
                                               ))]
+           [copy (inline (list "# t0: copy-count"
+                               "# $t3: origin-pointer"
+                               "# $t4: destination-pointer"
+                               "\ncopy:"
+                               "beq $t0, $0, copyReturn # if(copy-counter == 0) return"
+                               "lw $t5, ($t3)"
+                               "sw $t5, ($t4) \t\t# copy one value"
+                               "addi $t3, $t3, 4"
+                               "addi $t4, $t4, 4 \t# move both pointers one position"
+                               "sub $t0, $t0, 1 \t# decrease env-counter"
+                               "j copy:"
+                               "\ncopyReturn:"
+                               "jr $ra"
+                               ""))]
            [ending (inline (list "addiu $sp, $sp, 4 \t# move sp to value"
-                            "li\t$v0, 1 \t\t# code 1 for print integer"
+                                 "li\t$v0, 1 \t\t# code 1 for print integer"
                                  "lw\t$a0, 0($sp) \t# integer to print"
                                  "syscall"
                                  "li\t$v0, 4 \t\t# code 4 for print string"
@@ -482,6 +497,10 @@
                                                          "lw $ra, 0($fp)"
                                                          (string-append "la $t0, " (~a n))
                                                          "sw $t0, 0($sp)"
+                                                         "addi $sp, $sp, -4"
+                                                         "lw $t0, 12($fp)"
+                                                         "addiu $t0, $t0, 2"
+                                                         "sw $t0, 0($sp) \t\t# put the function size at top"
                                                          ))]
                         [(ACCESS n) (inline (list (string-append "\n\t# (ACCESS " (~a n) ")")
                                                   "addi $sp, $sp, -4"
@@ -508,32 +527,44 @@
                                              "addiu $sp, $sp, 8"
                                              ))]
                         [(APPLY) (inline (list "# (APPLY)"
-                                               "lw $t0, 0($sp) \t\t# argument into $t0"
-                                               "addi $t3,$t8,2 \t\t# t3 = env-size + 2"
+                                               "# copy the function environment into a new frame"
+                                               "lw $t0, 0($sp) \t\t# argument-size into $t0"
                                                "li $t1, 4"
-                                               "mult $t3, $t1"
-                                               "mflo $t3 \t\t# t3 = t3 * 4 (alignment)"
-                                               "sub $t3, $sp, $t3"
-                                               "sw $t0, ($t3) \t\t# sp[t3] = t0"
-                                               "addi $sp, $sp, -4"
-                                               "lw $t8, 0($sp) \t\t# argument for copyEnv"
-                                               "jal copyEnv"
-                                               "addi $t3, $t8, 2"
-                                               "li $t1, 4"
-                                               "mult $t3, $t1"
-                                               "mflo $t3 \t\t# t3 = t3 * 4 (alignment)"
-                                               "sub $t3, $sp, $t3"
-                                               "addi $sp, $sp, 8"
-                                               "sw $sp, ($t3) \t\t# save old stack pointer"
-                                               "addi $t3, $t3, -4"
-                                               "sw $fp, ($t3) \t\t# save old frame pointer"
-                                               "addi $t3, $t3, -4"
-                                               "sw $ra, ($t3) \t\t# save return address"
-                                               "lw $t1, 0($sp) \t\t# function location into $t1"
-                                               "move $sp, $t3 \t\t# move the stack to the new stack position"
-                                               "move $fp, $sp \t\t# refresh frame pointer (below stack)"
-                                               "addiu $t3, $t3, -4 \t# position t3 at new stack position"
-                                               "jal $t1 \t\t# call function"))]
+                                               "mult $t0, $t1"
+                                               "mflo $t0 \t\t# t0 = t0 * 4 (alignment)"
+                                               "add $t0, $sp $t0 \t# $t0 points to function size"
+                                               "lw $t6, 4($t0) \t\t# store function pointer to the end"
+                                               "add $t3, $t0, 12 \t# t3 points to env start"
+                                               "lw $t4, 8($t0) \t\t# t4 = env-size"
+                                               "move $t2, $t4 \t\t# t2 env-size"
+                                               "mult $t4, $t1"
+                                               "mflo $t4 \t\t# t4 = t4 * 4 (alignment)"
+                                               "sub $t4, $sp, $t4"
+                                               "move $t5, $t4"
+                                               "move $t0, $t2"
+                                               "jal copy"
+                                               "# copy the argument into the head of the new frame environment"
+                                               "lw $t0, 0($sp) \t\t# argument-size into $t0"
+                                               "add $t2, $t2, $t0 \t# t2 = env-size + arg-size"
+                                               "move $t4, $t2"
+                                               "mult $t4, $t1"
+                                               "mflo $t4 \t\t# t4 = t4 * 4 (alignment)"
+                                               "sub $t4, $sp, $t4 \t# t4 aligned to copy arg"
+                                               "move $t5, $t4"
+                                               "# addi $t2, $t2, 1"
+                                               "sw $t2, -4($t4) \t\t# new env-size positioned"
+                                               "move $t3, $sp \t\t# t3 points to argument start"
+                                               "jal copy"
+                                               "# copy old frame values"
+                                               "sub $t5, $t5, 8"
+                                               "sw $sp, ($t5)"
+                                               "sw $fp, -4($t5)"
+                                               "sw $ra, -8($t5)"
+                                               "sub $t5, $t5, 8"
+                                               "move $sp, $t5"
+                                               "move $fp, $sp"
+                                               "jal $t6 \t\t# call function"
+                                               ))]
                         [(RETURN) (inline (list ""
                                                 "# (RETURN)"
                                                 "lw $t0, 0($sp) \t\t# return value into $t0"
@@ -560,6 +591,7 @@
                    "new_line:\t.asciiz \"\\n\"\n"
                    constants
                    "\n\t\t.text\n"
+                   copy
                    captureEnvPrimitive
                    copyEnvPrimivite
                    funDefs
@@ -579,7 +611,7 @@
                    #:exists 'replace))
 
 
-(let ([prog '{- {+ 2 3} 8}])
+(let ([prog '{{fun {x} 8} 1}])
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
 
