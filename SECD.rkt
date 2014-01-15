@@ -500,15 +500,28 @@
                                                          "sw $t0, 0($sp) \t\t# put the function size at top"
                                                          ))]
                         [(ACCESS n) (inline (list (string-append "\n\t# (ACCESS " (~a n) ")")
-                                                  "addi $sp, $sp, -4"
-                                                  "li $t1, 2"
-                                                  (string-append "addi $t0, $t1, " (~a n))
+                                                  "addi $t3, $fp, 16 \t\t# t3 points to first env value"
                                                   "li $t1, 4"
-                                                  "mult $t0, $t1"
-                                                  "mflo $t0 		# t3 = t3 * 4 (alignment)"
-                                                  "add $t0, $fp, $t0"
-                                                  "lw $t1, ($t0)"
-                                                  "sw $t1, 0($sp)"))]
+                                                  (string-append "li $t0," (~a (- n 1)) "\t\t# position counter")
+                                                  "\naccessLoop:"
+                                                  "beq $t0, $0, accessReturn"
+                                                  "lw $t2, ($t3) \t\t# t2 = struct size"
+                                                  "mult $t2, $t1"
+                                                  "mflo $t2"
+                                                  "add $t3, $t3, $t2"
+                                                  "sub $t0, $t0, 1 \t\t# decrease the counter"
+                                                  "j accessLoop"
+                                                  "\naccessReturn:"
+                                                  "lw $t0, ($t3) \t\t# save the struct size"
+                                                  "move $t2, $t0"
+                                                  "mult $t2, $t1"
+                                                  "mflo $t2"
+                                                  "sub $t4, $sp, $t2"
+                                                  "move $sp, $t4"
+                                                  "move $t9, $ra"
+                                                  "jal copy"
+                                                  "move $ra, $t9"
+                                                  ))]
                         [(ADD) (inline (list "# (ADD)"
                                              "lw $t0, 4($sp)"
                                              "lw $t1, 12($sp)"
@@ -624,7 +637,7 @@
                    #:exists 'replace))
 
 
-(let ([prog '{{fun {x} 8} 1}])
+(let ([prog '{{fun {x} x} 1}])
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
 
