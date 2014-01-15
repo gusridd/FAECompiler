@@ -470,6 +470,9 @@
                                                  "addi $sp, $sp, -4"
                                                  (string-append "lw $t0, int" (~a n))
                                                  "sw $t0, 0($sp)"
+                                                 "addi $sp, $sp, -4"
+                                                 "li $t0, 1"
+                                                 "sw $t0, 0($sp) \t# put the size of int"
                                                  ))]
                         [(CLOSURE_CONST n) (inline (list (string-append "# (CLOSURE_CONST " (~a n) ")")
                                                          "addi $sp, $sp, -4"
@@ -490,18 +493,20 @@
                                                   "lw $t1, ($t0)"
                                                   "sw $t1, 0($sp)"))]
                         [(ADD) (inline (list "# (ADD)"
-                                             "lw $t0, 0($sp)"
+                                             "lw $t0, 4($sp)"
                                              "addi $sp, $sp, 4"
-                                             "lw $t1, 0($sp)"
+                                             "lw $t1, 12($sp)"
                                              "add $t1, $t1, $t0"
-                                             "sw $t1, 0($sp)"
+                                             "sw $t1, 12($sp)"
+                                             "addiu $sp, $sp, 8"
                                              ))]
                         [(SUB) (inline (list "# (SUB)"
-                                             "lw $t0, 0($sp)"
+                                             "lw $t0, 4($sp)"
                                              "addi $sp, $sp, 4"
-                                             "lw $t1, 0($sp)"
+                                             "lw $t1, 12($sp)"
                                              "sub $t1, $t1, $t0"
-                                             "sw $t1, 0($sp)"
+                                             "sw $t1, 12($sp)"
+                                             "addiu $sp, $sp, 8"
                                              ))]
                         [(APPLY) (inline (list "# (APPLY)"
                                                "lw $t0, 0($sp) \t\t# argument into $t0"
