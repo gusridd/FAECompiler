@@ -405,31 +405,6 @@
                                                                                      (λ(k v)
                                                                                        (match k
                                                                                          [(CLOSURE ins) (filter CONST? ins)]))))))))]
-           [copyEnvPrimivite (inline (list "\ncopyEnvReturn:"
-                                           "# lw $t0, 0($fp)"
-                                           "jr $ra"
-                                           ""
-                                           "\ncopyEnv: \t\t\t# after this call a zero must appear at 0($sp)"
-                                           "beq $t8, $0, copyEnvReturn \t# if env.size == 0 return"
-                                           "lw $t0, 0($sp)"
-                                           "addi $t3, $t0, 3 \t# t3 = t0 + 3 (for the old_fp and old_sp)"
-                                           "li $t1, 4"
-                                           "mult $t3,$t1"
-                                           "mflo $t3 \t\t# t3 = t3 * 4 (alignment)"
-                                           "add $t4, $t3, $fp"
-                                           "# sw ($t4), 0($sp) \t# sp[0] = fp[t3] ($t4 is positioned at env[arg])"
-                                           "sub $t5, $t8, $t0 \t# t5 = env-size - arg"
-                                           "mult $t5,$t1"
-                                           "mflo $t5 \t\t# t5 = t5 * 4 (alignment)"
-                                           "sub $t5, $sp, $t5"
-                                           "lw $t4, ($t4)"
-                                           "sw $t4, ($t5) \t\t# the actual copy"
-                                           "# addi $sp, $sp, -4 \t# (reposition the stack pointer)"
-                                           "beq $t0, $0, copyEnvReturn\t# if(t0 == 0) return"
-                                           "addi $t3, $t0, -1 \t# t3 = t0 - 1"
-                                           "sw $t3, 0($sp) \t\t# sp[0] = t3"
-                                           "j copyEnv"
-                                           ))]
            [captureEnvPrimitive (inline (list "\ncaptureEnv:"
                                               "lw $t0, 12($fp) \t\t# t0 = env-size"
                                               "li $t1, 4"
@@ -633,7 +608,6 @@
                    copy
                    access
                    captureEnvPrimitive
-                   copyEnvPrimivite
                    funDefs
                    "main:\n"
                    "\taddi $sp, $sp, -12\n"
@@ -655,7 +629,7 @@
     (display (spim-compile (compile prog)))
     (spim-compile-to-file prog "s.s"))
 
-(let ([prog '{{fun {x} x} 9}])
+(let ([prog '{{fun {x} x} 8}])
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
 
