@@ -457,6 +457,7 @@
            [copy (inline (list "# t0: copy-count"
                                "# $t3: origin-pointer"
                                "# $t4: destination-pointer"
+                               "# description: copies the memory starting at $t3 to $t4 by a size of $t0 words"
                                "\ncopy:"
                                "beq $t0, $0, copyReturn # if(copy-counter == 0) return"
                                "lw $t5, ($t3)"
@@ -470,6 +471,7 @@
                                ""))]
            [access (inline (list "# $t0: counter"
                                  "# $t3: pointer to last structure"
+                                 "# description: leaves $t3 pointing to the structure at env[$t0]"
                                  "\naccess:"
                                  "beq $t0, $0, accessReturn"
                                  "lw $t2, ($t3) \t\t# t2 = struct size"
