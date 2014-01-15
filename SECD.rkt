@@ -468,6 +468,19 @@
                                "\ncopyReturn:"
                                "jr $ra"
                                ""))]
+           [access (inline (list "# $t0: counter"
+                                 "# $t3: pointer to last structure"
+                                 "\naccess:"
+                                 "beq $t0, $0, accessReturn"
+                                 "lw $t2, ($t3) \t\t# t2 = struct size"
+                                 "mult $t2, $t1"
+                                 "mflo $t2"
+                                 "add $t3, $t3, $t2"
+                                 "sub $t0, $t0, 1 \t\t# decrease the counter"
+                                 "j access"
+                                 "\naccessReturn:"
+                                 "jr $ra"
+                                 ))]
            [ending (inline (list "addiu $sp, $sp, 4 \t# move sp to value"
                                  "li\t$v0, 1 \t\t# code 1 for print integer"
                                  "lw\t$a0, 0($sp) \t# integer to print"
@@ -503,15 +516,11 @@
                                                   "addi $t3, $fp, 16 \t\t# t3 points to first env value"
                                                   "li $t1, 4"
                                                   (string-append "li $t0," (~a (- n 1)) "\t\t# position counter")
-                                                  "\naccessLoop:"
-                                                  "beq $t0, $0, accessReturn"
-                                                  "lw $t2, ($t3) \t\t# t2 = struct size"
-                                                  "mult $t2, $t1"
-                                                  "mflo $t2"
-                                                  "add $t3, $t3, $t2"
-                                                  "sub $t0, $t0, 1 \t\t# decrease the counter"
-                                                  "j accessLoop"
-                                                  "\naccessReturn:"
+                                                  
+                                                  "move $t9, $ra"
+                                                  "jal access"
+                                                  "move $ra, $t9"
+                                                  
                                                   "lw $t0, ($t3) \t\t# save the struct size"
                                                   "move $t2, $t0"
                                                   "mult $t2, $t1"
@@ -618,6 +627,7 @@
                    constants
                    "\n\t\t.text\n"
                    copy
+                   access
                    captureEnvPrimitive
                    copyEnvPrimivite
                    funDefs
@@ -637,7 +647,12 @@
                    #:exists 'replace))
 
 
-(let ([prog '{{fun {x} x} 1}])
+#;(let ([prog '{{fun {x} {fun {y} y}} 0}])
+    (display (spim-compile (compile prog)))
+    (spim-compile-to-file prog "s.s"))
+
+(let ([prog '{{fun {x} x} 9}])
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
+
 
