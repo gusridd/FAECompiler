@@ -387,17 +387,9 @@
 (defun (spim-compile ins-list)
   (letrec ([inline (λ(l) (apply string-append (map (λ(s) (string-append "\t" s "\n")) 
                                                    l)))]
-           #;[constants (apply string-append
-                               (map (λ(c) (let ([num (~a (CONST-n c))])
-                                            (string-append "int" num ":\t.word\t" num "\n"))) 
-                                    (remove-duplicates (filter (λ(e)(CONST? e)) ins-list))))]
-           ;[q (display (collectClosures ins-list))]
-           ;[o (display "\n")]
            [closureHash (make-hash (i-map (λ(e i) 
                                             (cons e (string-append "fun" (~a i)))) 
                                           (collectClosures ins-list)))]
-           ;[b (display closureHash)]
-           ;[c (display "\n")]
            [replaceClosures (λ(l) (map (λ(e) (match e
                                                [(CLOSURE ins) (CLOSURE_CONST (hash-ref closureHash e))]
                                                [_ e])) l))]
@@ -413,8 +405,6 @@
                                                                                      (λ(k v)
                                                                                        (match k
                                                                                          [(CLOSURE ins) (filter CONST? ins)]))))))))]
-           ;[g (display replacedClosureHash)]
-           ;[s (display "\n")]
            [copyEnvPrimivite (inline (list "\ncopyEnvReturn:"
                                            "# lw $t0, 0($fp)"
                                            "jr $ra"
@@ -440,9 +430,6 @@
                                            "sw $t3, 0($sp) \t\t# sp[0] = t3"
                                            "j copyEnv"
                                            ))]
-           [control_hack (inline (list "\ncontrol_hack:"
-                                       "jr $t1"))]
-           
            [ending (inline (list "li\t$v0, 1 \t\t# code 1 for print integer"
                                  "lw\t$a0, 0($sp) \t# integer to print"
                                  "syscall"
@@ -452,7 +439,6 @@
                                  "li\t$v0, 10 \t\t #code for exit"
                                  "syscall"
                                  ))]
-           ;[a (display funDefs)]
            [comp (λ(e)(match e
                         [(CONST n) (inline (list (string-append "# (CONST " (~a n) ")")
                                                  "addi $sp, $sp, -4"
@@ -541,7 +527,6 @@
                    "new_line:\t.asciiz \"\\n\"\n"
                    constants
                    "\n\t\t.text\n"
-                   control_hack
                    copyEnvPrimivite
                    funDefs
                    "main:\n"
