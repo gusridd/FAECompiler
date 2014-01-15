@@ -372,16 +372,13 @@
 ;; $t6 -> temp usage
 ;; $t7 -> temp usage
 
-;; $t8 -> environment length (each time a function is called is incremented by one)
+;; $t9 RESERVED for storing $ra between calls to copy
 
 ;; 0($fp) -> return address
 ;; 4($fp) -> old frame pointer 
 ;; 8($fp) -> env[0] (new-arg)
 ;; 12($fp) -> env[1]
 
-;; $t9  -> old stack pointer  ($sp)
-;; $t10 -> old frame pointer  ($fp)
-;; $t11 -> old return address ($ra)
 
 ;; rules
 ;; before function aplication the environment must be copied into the stack, save the frame pointer to the top and the new parameter be placed at top. Refresh the fp and the sp
@@ -492,7 +489,7 @@
                                                  ))]
                         [(CLOSURE_CONST n) (inline (list (string-append "# (CLOSURE_CONST " (~a n) ")")
                                                          "addi $sp, $sp, -4"
-                                                         "sw $ra, 0($fp)"
+                                                         "#sw $ra, 0($fp)"
                                                          "jal captureEnv"
                                                          "lw $ra, 0($fp)"
                                                          (string-append "la $t0, " (~a n))
@@ -533,6 +530,15 @@
                                                "mult $t0, $t1"
                                                "mflo $t0 \t\t# t0 = t0 * 4 (alignment)"
                                                "add $t0, $sp $t0 \t# $t0 points to function size"
+                                               
+                                               "# calculate the $ra for the call and save it into t8"
+                                               "# $ra is the address at the base of the calling function" 
+                                               "lw $t8, ($t0)"
+                                               "sub $t8, $t8, 1"
+                                               "mult $t8, $t1"
+                                               "mflo $t8 \t\t# t4 = t4 * 4 (alignment)"
+                                               "add $t8, $t0, $t8 \t# return_address in $t8"
+                                               
                                                "lw $t6, 4($t0) \t\t# store function pointer to the end"
                                                "add $t3, $t0, 12 \t# t3 points to env start"
                                                "lw $t4, 8($t0) \t\t# t4 = env-size"
@@ -542,7 +548,9 @@
                                                "sub $t4, $sp, $t4"
                                                "move $t5, $t4"
                                                "move $t0, $t2"
+                                               "move $t9, $ra"
                                                "jal copy"
+                                               "move $ra, $t9"
                                                "# copy the argument into the head of the new frame environment"
                                                "lw $t0, 0($sp) \t\t# argument-size into $t0"
                                                "add $t2, $t2, $t0 \t# t2 = env-size + arg-size"
@@ -554,11 +562,13 @@
                                                "# addi $t2, $t2, 1"
                                                "sw $t2, -4($t4) \t\t# new env-size positioned"
                                                "move $t3, $sp \t\t# t3 points to argument start"
+                                               "move $t9, $ra"
                                                "jal copy"
+                                               "move $ra, $t9"
                                                "# copy old frame values"
                                                "sw $sp, -8($t7)"
                                                "sw $fp, -12($t7)"
-                                               "sw $ra, -16($t7)"
+                                               "sw $t8, -16($t7)"
                                                "sub $t7, $t7, 16"
                                                "move $sp, $t7"
                                                "move $fp, $sp"
@@ -566,22 +576,26 @@
                                                ))]
                         [(RETURN) (inline (list ""
                                                 "# (RETURN)"
-                                                "lw $t0, 0($sp) \t\t# return value into $t0"
-                                                "lw $t7, 0($fp) \t\t# restore old return address to t7"
-                                                "lw $t6, 4($fp) \t\t# restore old frame pointer to t6"
-                                                "lw $t5, 8($fp) \t\t# restore old stack pointer to t5"
-                                                "move $sp, $t5"
-                                                "move $fp, $t6"
-                                                "move $ra, $t7"
-                                                "sw $t0, 0($sp) \t\t# place return var into stack"
-                                                "addi $t8, $t8, -1 \t# env-size - 1"
-                                                "jr	$ra"))]))] 
+                                                "lw $t0, 0($sp) \t\t# return value-size into $t0"
+                                                "lw $t8, 0($fp) \t\t# return address base into $t8"
+                                                "sub $t4, $t0, 1"
+                                                "li $t1, 4"
+                                                "mult $t4, $t1"
+                                                "mflo $t4 \t\t# t4 = t4 * 4 (alignment)"
+                                                "sub $t4, $t8, $t4"
+                                                "move $t3, $sp"
+                                                "move $t6, $t4"
+                                                "move $t9, $ra"
+                                                "jal copy"
+                                                "move $ra, $t9"
+                                                "move $sp, $t6 \t# restore $sp"
+                                                "# lw $ra, 8($fp) \t# restore $ra"
+                                                "lw $fp, 4($fp) \t# restore $fp"
+                                                "jr $ra"))]))] 
            [funDefs (inline (hash-map replacedClosureHash
                                       (λ(k v) (string-append "\n" v ": # label for "
                                                              v
-                                                             "\n\t" 
-                                                             "addi $t8, $t8, 1 \t# env-size + 1\n"
-                                                             "\tsw $ra, 0($fp)\n"
+                                                             "sw $ra, 8($fp)\n"
                                                              (apply string-append (map comp (CLOSURE-ins k)))
                                                              ))
                                       
