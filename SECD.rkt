@@ -368,6 +368,9 @@
 
 ;; $t3 -> temp usage
 ;; $t4 -> temp usage
+;; $t5 -> temp usage
+;; $t6 -> temp usage
+;; $t7 -> temp usage
 
 ;; $t8 -> environment length (each time a function is called is incremented by one)
 
@@ -423,20 +426,43 @@
                                            "mflo $t5 \t\t# t5 = t5 * 4 (alignment)"
                                            "sub $t5, $sp, $t5"
                                            "lw $t4, ($t4)"
-                                           "sw $t4, ($t5) \t# the actual copy"
+                                           "sw $t4, ($t5) \t\t# the actual copy"
                                            "# addi $sp, $sp, -4 \t# (reposition the stack pointer)"
                                            "beq $t0, $0, copyEnvReturn\t# if(t0 == 0) return"
                                            "addi $t3, $t0, -1 \t# t3 = t0 - 1"
                                            "sw $t3, 0($sp) \t\t# sp[0] = t3"
                                            "j copyEnv"
                                            ))]
+           [captureEnvPrimitive (inline (list "\ncaptureEnv:"
+                                              "lw $t0, 12($fp) \t\t# t0 = env-size"
+                                              "li $t1, 4"
+                                              "move $t3, $t0"
+                                              "mult $t3, $t1"
+                                              "mflo $t3 \t\t# t3 = t3 * 4 (alignment)"
+                                              "sub $t3, $sp, $t3 \t# t3 is the position for the env-size"
+                                              "sw $t0, ($t3)"
+                                              "move $sp, $t3"
+                                              "addi $sp, $sp, -4 \t# position sp to receive function pointer"
+                                              "addi $t4, $t3, 4 \t# position t4 to receive the copy"
+                                              "addi $t3, $fp, 16 \t# position t3 to source the copy"
+                                              "\ncaptureEnvLoop:"
+                                              "beq $t0, $0, captureEnvReturn \t# if(env-counter == 0) return"
+                                              "lw $t5, ($t3)"
+                                              "sw $t5, ($t4) \t\t# copy one env value"
+                                              "addi $t3, $t3, 4"
+                                              "addi $t4, $t4, 4 \t# move both pointers one position"
+                                              "sub $t0, $t0, 1 \t# decrease env-counter"
+                                              "j captureEnvLoop"
+                                              "\ncaptureEnvReturn:"
+                                              "jr $ra"
+                                              ))]
            [ending (inline (list "li\t$v0, 1 \t\t# code 1 for print integer"
                                  "lw\t$a0, 0($sp) \t# integer to print"
                                  "syscall"
                                  "li\t$v0, 4 \t\t# code 4 for print string"
                                  "la\t$a0, new_line \t# string to print"
                                  "syscall"
-                                 "li\t$v0, 10 \t\t #code for exit"
+                                 "li\t$v0, 10 \t# code for exit"
                                  "syscall"
                                  ))]
            [comp (λ(e)(match e
@@ -447,6 +473,9 @@
                                                  ))]
                         [(CLOSURE_CONST n) (inline (list (string-append "# (CLOSURE_CONST " (~a n) ")")
                                                          "addi $sp, $sp, -4"
+                                                         "sw $ra, 0($fp)"
+                                                         "jal captureEnv"
+                                                         "lw $ra, 0($fp)"
                                                          (string-append "la $t0, " (~a n))
                                                          "sw $t0, 0($sp)"
                                                          ))]
@@ -527,11 +556,12 @@
                    "new_line:\t.asciiz \"\\n\"\n"
                    constants
                    "\n\t\t.text\n"
+                   captureEnvPrimitive
                    copyEnvPrimivite
                    funDefs
                    "main:\n"
-                   "addi $sp, $sp, -16"
-                   "\tadd $fp, $sp, 4\n"
+                   "\taddi $sp, $sp, -12\n"
+                   "\tmove $fp, $sp\n"
                    (foldr (λ(x y) (string-append x "\n" y)) 
                           ""
                           (map comp (replaceClosures ins-list)))
@@ -545,7 +575,7 @@
                    #:exists 'replace))
 
 
-(let ([prog '{{{fun {x} {fun {y} x}} 2} 1}])
+(let ([prog '{fun {x} 1}])
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
 
