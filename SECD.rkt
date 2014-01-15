@@ -456,7 +456,8 @@
                                               "\ncaptureEnvReturn:"
                                               "jr $ra"
                                               ))]
-           [ending (inline (list "li\t$v0, 1 \t\t# code 1 for print integer"
+           [ending (inline (list "addiu $sp, $sp, 4 \t# move sp to value"
+                            "li\t$v0, 1 \t\t# code 1 for print integer"
                                  "lw\t$a0, 0($sp) \t# integer to print"
                                  "syscall"
                                  "li\t$v0, 4 \t\t# code 4 for print string"
@@ -494,7 +495,6 @@
                                                   "sw $t1, 0($sp)"))]
                         [(ADD) (inline (list "# (ADD)"
                                              "lw $t0, 4($sp)"
-                                             "addi $sp, $sp, 4"
                                              "lw $t1, 12($sp)"
                                              "add $t1, $t1, $t0"
                                              "sw $t1, 12($sp)"
@@ -502,7 +502,6 @@
                                              ))]
                         [(SUB) (inline (list "# (SUB)"
                                              "lw $t0, 4($sp)"
-                                             "addi $sp, $sp, 4"
                                              "lw $t1, 12($sp)"
                                              "sub $t1, $t1, $t0"
                                              "sw $t1, 12($sp)"
@@ -580,7 +579,7 @@
                    #:exists 'replace))
 
 
-(let ([prog '{fun {x} 1}])
+(let ([prog '{- {+ 2 3} 8}])
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
 
