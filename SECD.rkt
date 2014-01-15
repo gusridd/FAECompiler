@@ -530,6 +530,7 @@
                    copyEnvPrimivite
                    funDefs
                    "main:\n"
+                   "addi $sp, $sp, -16"
                    "\tadd $fp, $sp, 4\n"
                    (foldr (λ(x y) (string-append x "\n" y)) 
                           ""
