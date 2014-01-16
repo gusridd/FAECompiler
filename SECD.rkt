@@ -571,7 +571,7 @@
                                                "jal copy"
                                                "move $ra, $t9"
                                                "# copy old frame values"
-                                               "sw $sp, -8($t7)"
+                                               "sw $ra, -8($t7)"
                                                "sw $fp, -12($t7)"
                                                "sw $t8, -16($t7)"
                                                "sub $t7, $t7, 16"
@@ -594,7 +594,7 @@
                                                 "jal copy"
                                                 "move $ra, $t9"
                                                 "move $sp, $t6 \t# restore $sp"
-                                                "# lw $ra, 8($fp) \t# restore $ra"
+                                                "lw $ra, 8($fp) \t# restore $ra"
                                                 "lw $fp, 4($fp) \t# restore $fp"
                                                 "jr $ra"))]))] 
            [funDefs (inline (hash-map replacedClosureHash
