@@ -460,7 +460,8 @@
                                  "\naccessReturn:"
                                  "jr $ra"
                                  ))]
-           [ending (inline (list "addiu $sp, $sp, 4 \t# move sp to value"
+           [ending (inline (list "end:"
+                            "addiu $sp, $sp, 4 \t# move sp to value"
                                  "li\t$v0, 1 \t\t# code 1 for print integer"
                                  "lw\t$a0, 0($sp) \t# integer to print"
                                  "syscall"
@@ -496,7 +497,7 @@
                                                          "sw $t0, 0($sp) \t\t# put the function size at top"
                                                          ))]
                         [(ACCESS n) (inline (list (string-append "\n\t# (ACCESS " (~a n) ")")
-                                                  "addi $t3, $fp, 16 \t\t# t3 points to first env value"
+                                                  "addi $t3, $fp, 16 \t# t3 points to first env value"
                                                   "li $t1, 4"
                                                   (string-append "li $t0," (~a (- n 1)) "\t\t# position counter")
                                                   
@@ -600,7 +601,7 @@
            [funDefs (inline (hash-map replacedClosureHash
                                       (λ(k v) (string-append "\n" v ": # label for "
                                                              v
-                                                             "#sw $ra, 8($fp)\n"
+                                                             "\n\tsw $ra, 8($fp) \t# save old $ra"
                                                              (apply string-append (map comp (CLOSURE-ins k)))
                                                              ))
                                       
@@ -629,7 +630,7 @@
                    #:exists 'replace))
 
 
-#;(let ([prog '{{fun {x} {fun {y} y}} 0}])
+(let ([prog '{{fun {x} {fun {y} y}} 0}])
     (display (spim-compile (compile prog)))
     (spim-compile-to-file prog "s.s"))
 
@@ -637,7 +638,7 @@
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
 
-(let ([prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}])
+#;(let ([prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}])
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
 
