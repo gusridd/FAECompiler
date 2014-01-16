@@ -482,8 +482,12 @@
                         [(CLOSURE_CONST n) (inline (list (string-append "# (CLOSURE_CONST " (~a n) ")")
                                                          "addi $sp, $sp, -4"
                                                          "#sw $ra, 0($fp)"
+                                                         
+                                                         "move $t9, $ra"
                                                          "jal captureEnv"
-                                                         "lw $ra, 0($fp)"
+                                                         "move $ra, $t9"
+                                                         
+                                                         "#lw $ra, 0($fp)"
                                                          (string-append "la $t0, " (~a n))
                                                          "sw $t0, 0($sp)"
                                                          "addi $sp, $sp, -4"
@@ -596,7 +600,7 @@
            [funDefs (inline (hash-map replacedClosureHash
                                       (λ(k v) (string-append "\n" v ": # label for "
                                                              v
-                                                             "sw $ra, 8($fp)\n"
+                                                             "#sw $ra, 8($fp)\n"
                                                              (apply string-append (map comp (CLOSURE-ins k)))
                                                              ))
                                       
@@ -629,7 +633,16 @@
     (display (spim-compile (compile prog)))
     (spim-compile-to-file prog "s.s"))
 
-(let ([prog '{{fun {x} x} 8}])
+#;(let ([prog '{{{fun {x} {fun {y} x}} 3} 4}])
+  (display (spim-compile (compile prog)))
+  (spim-compile-to-file prog "s.s"))
+
+(let ([prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}])
+  (display (spim-compile (compile prog)))
+  (spim-compile-to-file prog "s.s"))
+
+#;(let ([prog '{{{fun {f} 
+                    {fun {arg} {f arg}}} {fun {x} {+ x 1}}} 5}])
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
 
