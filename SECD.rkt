@@ -10,9 +10,13 @@
 
 (deftype Instruction
   (INT_CONST n)
+  (BOOL_CONST b)
   (CLOSURE_CONST name)
   (ADD)
   (SUB)
+  (AND)
+  (OR)
+  (NOT)
   (ACCESS n)
   (CLOSURE ins)
   (BRANCH exprs)
@@ -20,7 +24,7 @@
   (ENDLET)
   (APPLY)
   (RETURN)
-  (IF0))
+  (IF))
 
 ;; values
 (deftype Val
@@ -57,6 +61,8 @@
            (match ins-list
              [(list (INT_CONST n) tail ...) 
               (run tail (stack-push stack (INT_CONST n)) env)]
+             [(list (BOOL_CONST b) tail ...) 
+              (run tail (stack-push stack (BOOL_CONST b)) env)]
              [(list (ADD) tail ...) (def (INT_CONST n1) (stack-top stack))
                                     (def (INT_CONST n2) (stack-top (stack-pop stack)))
                                     (def new-stack (stack-pop (stack-pop stack)))
@@ -68,13 +74,13 @@
              [(list (BRANCH exprs) tail ...) (run tail
                                                   (stack-push stack exprs)
                                                   env)]
-             [(list (IF0) tail ...) (def (INT_CONST c) (stack-top stack))
-                                    (def t-branch (stack-top (stack-pop stack)))
-                                    (def f-branch (stack-top (stack-pop (stack-pop stack))))
-                                    (def new-stack (stack-pop (stack-pop (stack-pop stack))))
-                                    (if (= 0 c)
-                                        (run (append t-branch tail) new-stack env)
-                                        (run (append f-branch tail) new-stack env))]             
+             [(list (IF) tail ...) (def (BOOL_CONST b) (stack-top stack))
+                                   (def t-branch (stack-top (stack-pop stack)))
+                                   (def f-branch (stack-top (stack-pop (stack-pop stack))))
+                                   (def new-stack (stack-pop (stack-pop (stack-pop stack))))
+                                   (if b
+                                       (run (append t-branch tail) new-stack env)
+                                       (run (append f-branch tail) new-stack env))]             
              [(list (ACCESS n) tail ...) (run tail 
                                               (stack-push stack (list-ref env (- n 1))) 
                                               env)]
@@ -128,14 +134,14 @@
 
 (test (machine (list (BRANCH (list (INT_CONST 2))) 
                      (BRANCH (list (INT_CONST 1))) 
-                     (INT_CONST 0) 
-                     (IF0)))
+                     (BOOL_CONST #t) 
+                     (IF)))
       (INT_CONST 1))
 
 (test (machine (list (BRANCH (list (INT_CONST 2))) 
                      (BRANCH (list (INT_CONST 1))) 
-                     (INT_CONST 9) 
-                     (IF0)))
+                     (BOOL_CONST #f) 
+                     (IF)))
       (INT_CONST 2))
 
 (test (machine (list
@@ -148,7 +154,7 @@
                       (BRANCH (list (ACCESS 2)))
                       (BRANCH (list (ACCESS 3)))
                       (ACCESS 1)
-                      (IF0)
+                      (IF)
                       (RETURN)))
                     (RETURN)))
                   (RETURN)))
@@ -156,7 +162,7 @@
                 (APPLY)
                 (INT_CONST 2)
                 (APPLY)
-                (INT_CONST 0)
+                (BOOL_CONST #t)
                 (APPLY)))
       (INT_CONST 1))
 
@@ -225,9 +231,10 @@
 |#
 (deftype Expr
   (num n)
+  (bool b)
   (add l r)
   (sub l r)
-  (if0 c t f)
+  (my-if c t f)
   (id s)
   (with a b)
   (acc n)
@@ -238,12 +245,13 @@
 (defun (parse s-expr)
   (match s-expr
     [(? number?) (num s-expr)]
+    [(? boolean?) (bool s-expr)]
     [(? symbol?) (id s-expr)]
     [(list '+ l r) (add (parse l) (parse r))]
     [(list '- l r) (sub (parse l) (parse r))]
-    [(list 'if0 c t f) (if0 (parse c)
-                            (parse t)
-                            (parse f))]
+    [(list 'if c t f) (my-if (parse c)
+                             (parse t)
+                             (parse f))]
     [(list 'with a 'in b) (with (parse a) (parse b))]
     [(list 'acc n) (acc n)]
     [(list 'fun (list x) b) (fun x (parse b))]
@@ -254,15 +262,16 @@
   (letrec ([auxBruijn (λ(e bid lvl)
                         (match e
                           [(num n) (num n)]
+                          [(bool b) (bool b)]
                           [(acc n) (acc n)]
                           [(id x) (if (eq? x bid)
                                       (bruijnNumber lvl)
                                       (id x))]
                           [(add l r) (add (auxBruijn l bid lvl) (auxBruijn r bid lvl))]
                           [(sub l r) (sub (auxBruijn l bid lvl) (auxBruijn r bid lvl))]
-                          [(if0 c t f) (if0 (auxBruijn c bid lvl)
-                                            (auxBruijn t bid lvl)
-                                            (auxBruijn f bid lvl))]
+                          [(my-if c t f) (my-if (auxBruijn c bid lvl)
+                                                (auxBruijn t bid lvl)
+                                                (auxBruijn f bid lvl))]
                           [(app a b) (app (auxBruijn a bid lvl) (auxBruijn b bid lvl))]
                           [(fun id body) (if (eq? id bid)
                                              (deBruijn (fun id body))
@@ -276,9 +285,9 @@
       [(id x) (id x)]
       [(add l r) (add (deBruijn l) (deBruijn r))]
       [(sub l r) (sub (deBruijn l) (deBruijn r))]
-      [(if0 c t f) (if0 (deBruijn c)
-                        (deBruijn t)
-                        (deBruijn f))]
+      [(my-if c t f) (my-if (deBruijn c)
+                            (deBruijn t)
+                            (deBruijn f))]
       [(with a b) (with (deBruijn a) (deBruijn b))]
       [(app a b) (app (deBruijn a) (deBruijn b))]
       [(fun id body) (bruijnFun (auxBruijn body id 1))])))
@@ -312,13 +321,14 @@
            [comp (λ(e)
                    (match e
                      [(num n) (list (INT_CONST n))]
+                     [(bool b) (list (BOOL_CONST b))]
                      [(acc n) (list (ACCESS n))]
                      [(add l r) (append (comp l) (comp r) (list (ADD)))]
                      [(sub l r) (append (comp l) (comp r) (list (SUB)))]
-                     [(if0 c t f) (append (list (BRANCH (comp f)))
-                                          (list (BRANCH (comp t)))
-                                          (comp c)
-                                          (list (IF0)))]
+                     [(my-if c t f) (append (list (BRANCH (comp f)))
+                                            (list (BRANCH (comp t)))
+                                            (comp c)
+                                            (list (IF)))]
                      [(with a b) (append (comp a) (list (LET)) (comp b) (list (ENDLET)))]
                      [(app a b) (append (comp a) (comp b) (list (APPLY)))]
                      [(fun id body) (list (CLOSURE (append (comp body) (list (RETURN)))))]
@@ -530,13 +540,13 @@
                                  ))]
            [comp (λ(e)(match e
                         [(INT_CONST n) (inline (list (string-append "# (INT_CONST " (~a n) ")")
-                                                 "addi $sp, $sp, -4"
-                                                 (string-append "lw $t0, int" (~a n))
-                                                 "sw $t0, 0($sp)"
-                                                 "addi $sp, $sp, -4"
-                                                 "li $t0, 2"
-                                                 "sw $t0, 0($sp) \t# put the size of int"
-                                                 ))]
+                                                     "addi $sp, $sp, -4"
+                                                     (string-append "lw $t0, int" (~a n))
+                                                     "sw $t0, 0($sp)"
+                                                     "addi $sp, $sp, -4"
+                                                     "li $t0, 2"
+                                                     "sw $t0, 0($sp) \t# put the size of int"
+                                                     ))]
                         [(CLOSURE_CONST n) (inline (list (string-append "# (CLOSURE_CONST " (~a n) ")")
                                                          "addi $sp, $sp, -4"
                                                          "#sw $ra, 0($fp)"
@@ -696,8 +706,8 @@
     (spim-compile-to-file prog "s.s"))
 
 (let ([prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}])
-    (display (spim-compile (compile prog)))
-    (spim-compile-to-file prog "s.s"))
+  (display (spim-compile (compile prog)))
+  (spim-compile-to-file prog "s.s"))
 
 #;(let ([prog '{+ {fun {f} f} 3}])
     (display (spim-compile (compile prog)))
@@ -709,17 +719,17 @@
     (spim-compile-to-file prog "s.s"))
 
 #;(let ([prog  '{
-               {{fun {f}
-                     {{fun {frec} {frec frec}}
-                      {fun {next}
-                           {fun {n}
-                                {{f {next next}} n}}}}}
-                
-                {fun {next}
-                     {fun {n}
-                          {next n}}}}
-               5}])
-  (spim-compile-to-file prog "s.s"))
+                 {{fun {f}
+                       {{fun {frec} {frec frec}}
+                        {fun {next}
+                             {fun {n}
+                                  {{f {next next}} n}}}}}
+                  
+                  {fun {next}
+                       {fun {n}
+                            {next n}}}}
+                 5}])
+    (spim-compile-to-file prog "s.s"))
 
 
 
