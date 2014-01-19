@@ -461,7 +461,7 @@
                                  "jr $ra"
                                  ))]
            [ending (inline (list "end:"
-                            "addiu $sp, $sp, 4 \t# move sp to value"
+                                 "addiu $sp, $sp, 4 \t# move sp to value"
                                  "li\t$v0, 1 \t\t# code 1 for print integer"
                                  "lw\t$a0, 0($sp) \t# integer to print"
                                  "syscall"
@@ -630,21 +630,39 @@
                    #:exists 'replace))
 
 
-(let ([prog '{{fun {x} {fun {y} y}} 0}])
+#;(let ([prog '{{fun {x} {fun {y} y}} 0}])
     (display (spim-compile (compile prog)))
     (spim-compile-to-file prog "s.s"))
 
 #;(let ([prog '{{{fun {x} {fun {y} x}} 3} 4}])
-  (display (spim-compile (compile prog)))
-  (spim-compile-to-file prog "s.s"))
+    (display (spim-compile (compile prog)))
+    (spim-compile-to-file prog "s.s"))
 
 #;(let ([prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}])
-  (display (spim-compile (compile prog)))
-  (spim-compile-to-file prog "s.s"))
+    (display (spim-compile (compile prog)))
+    (spim-compile-to-file prog "s.s"))
+
+#;(let ([prog '{+ {fun {f} f} 3}])
+    (display (spim-compile (compile prog)))
+    (spim-compile-to-file prog "s.s"))
 
 #;(let ([prog '{{{fun {f} 
-                    {fun {arg} {f arg}}} {fun {x} {+ x 1}}} 5}])
-  (display (spim-compile (compile prog)))
-  (spim-compile-to-file prog "s.s"))
+                      {fun {arg} {f arg}}} {fun {x} {+ x 1}}} 5}])
+    (display (spim-compile (compile prog)))
+    (spim-compile-to-file prog "s.s"))
+
+(let ([prog  '{
+               {{fun {f}
+                     {{fun {frec} {frec frec}}
+                      {fun {next}
+                           {fun {n}
+                                {{f {next next}} n}}}}}
+               
+                {fun {next}
+                     {fun {n}
+                          {next n}}}}
+               5}])
+(spim-compile-to-file prog "s.s"))
+
 
 
