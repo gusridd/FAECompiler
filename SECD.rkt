@@ -68,7 +68,7 @@
              [(list (BRANCH exprs) tail ...) (run tail
                                                   (stack-push stack exprs)
                                                   env)]
-             [(list (IF0) tail ...) (def (CONST c) (stack-top stack))
+             [(list (IF0) tail ...) (def (INT_CONST c) (stack-top stack))
                                     (def t-branch (stack-top (stack-pop stack)))
                                     (def f-branch (stack-top (stack-pop (stack-pop stack))))
                                     (def new-stack (stack-pop (stack-pop (stack-pop stack))))
@@ -126,17 +126,17 @@
                      (ENDLET)))
       (INT_CONST 3))
 
-(test (machine (list (BRANCH (list (CONST 2))) 
-                     (BRANCH (list (CONST 1))) 
-                     (CONST 0) 
+(test (machine (list (BRANCH (list (INT_CONST 2))) 
+                     (BRANCH (list (INT_CONST 1))) 
+                     (INT_CONST 0) 
                      (IF0)))
-      (CONST 1))
+      (INT_CONST 1))
 
-(test (machine (list (BRANCH (list (CONST 2))) 
-                     (BRANCH (list (CONST 1))) 
-                     (CONST 9) 
+(test (machine (list (BRANCH (list (INT_CONST 2))) 
+                     (BRANCH (list (INT_CONST 1))) 
+                     (INT_CONST 9) 
                      (IF0)))
-      (CONST 2))
+      (INT_CONST 2))
 
 (test (machine (list
                 (CLOSURE
@@ -152,13 +152,13 @@
                       (RETURN)))
                     (RETURN)))
                   (RETURN)))
-                (CONST 1)
+                (INT_CONST 1)
                 (APPLY)
-                (CONST 2)
+                (INT_CONST 2)
                 (APPLY)
-                (CONST 0)
+                (INT_CONST 0)
                 (APPLY)))
-      (CONST 1))
+      (INT_CONST 1))
 
 (test/exn (machine (list (INT_CONST 5)
                          (INT_CONST 2))) "CORRUPT_ENDING_STATE")
