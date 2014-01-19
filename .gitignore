@@ -1,4 +1,5 @@
 *.rkt~
 *.s
+*.orig
 .gitignore~
 /compiled
