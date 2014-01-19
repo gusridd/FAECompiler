@@ -9,7 +9,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;
 
 (deftype Instruction
-  (CONST n)
+  (INT_CONST n)
   (CLOSURE_CONST name)
   (ADD)
   (SUB)
@@ -53,16 +53,16 @@
                       (error "SIGFAULT"))])
          (with-handlers ([non-local-exn? fault])
            (match ins-list
-             [(list (CONST n) tail ...) 
-              (run tail (stack-push stack (CONST n)) env)]
-             [(list (ADD) tail ...) (def (CONST n1) (stack-top stack))
-                                    (def (CONST n2) (stack-top (stack-pop stack)))
+             [(list (INT_CONST n) tail ...) 
+              (run tail (stack-push stack (INT_CONST n)) env)]
+             [(list (ADD) tail ...) (def (INT_CONST n1) (stack-top stack))
+                                    (def (INT_CONST n2) (stack-top (stack-pop stack)))
                                     (def new-stack (stack-pop (stack-pop stack)))
-                                    (run tail (stack-push new-stack (CONST (+ n2 n1))) env)]
-             [(list (SUB) tail ...) (def (CONST n1) (stack-top stack))
-                                    (def (CONST n2) (stack-top (stack-pop stack)))
+                                    (run tail (stack-push new-stack (INT_CONST (+ n2 n1))) env)]
+             [(list (SUB) tail ...) (def (INT_CONST n1) (stack-top stack))
+                                    (def (INT_CONST n2) (stack-top (stack-pop stack)))
                                     (def new-stack (stack-pop (stack-pop stack)))
-                                    (run tail (stack-push new-stack (CONST (- n2 n1))) env)]
+                                    (run tail (stack-push new-stack (INT_CONST (- n2 n1))) env)]
              
              [(list (ACCESS n) tail ...) (run tail 
                                               (stack-push stack (list-ref env (- n 1))) 
@@ -94,75 +94,75 @@
   (run ins-list (stack-init) '()))
 
 
-(test (machine (list (CONST 5)))
-      (CONST 5))
+(test (machine (list (INT_CONST 5)))
+      (INT_CONST 5))
 
-(test (machine (list (CONST 1)
-                     (CONST 2)
+(test (machine (list (INT_CONST 1)
+                     (INT_CONST 2)
                      (ADD)))
-      (CONST 3))
+      (INT_CONST 3))
 
-(test (machine (list (CONST 5)
-                     (CONST 1)
-                     (CONST 2)
+(test (machine (list (INT_CONST 5)
+                     (INT_CONST 1)
+                     (INT_CONST 2)
                      (ADD)
                      (SUB))) 
-      (CONST 2))
+      (INT_CONST 2))
 
-(test (machine (list (CONST 3) 
+(test (machine (list (INT_CONST 3) 
                      (LET) 
                      (ACCESS 1) 
                      (ENDLET)))
-      (CONST 3))
+      (INT_CONST 3))
 
 
 
-(test/exn (machine (list (CONST 5)
-                         (CONST 2))) "CORRUPT_ENDING_STATE")
+(test/exn (machine (list (INT_CONST 5)
+                         (INT_CONST 2))) "CORRUPT_ENDING_STATE")
 
-(test/exn (machine (list (CONST 5)
-                         (CONST 2)
-                         (CONST 2)
+(test/exn (machine (list (INT_CONST 5)
+                         (INT_CONST 2)
+                         (INT_CONST 2)
                          (ADD))) "CORRUPT_ENDING_STATE")
 
-(test/exn (machine (list (CONST 5)
-                         (CONST 2)
-                         (CONST 2)
+(test/exn (machine (list (INT_CONST 5)
+                         (INT_CONST 2)
+                         (INT_CONST 2)
                          (SUB))) "CORRUPT_ENDING_STATE")
 
 (test/exn (machine (list (ADD))) "SIGFAULT")
-(test/exn (machine (list (CONST 1) (ADD))) "SIGFAULT")
+(test/exn (machine (list (INT_CONST 1) (ADD))) "SIGFAULT")
 (test/exn (machine (list (SUB))) "SIGFAULT")
-(test/exn (machine (list (CONST 1) (SUB))) "SIGFAULT")
-(test/exn (machine (list (CONST 1) (CONST 4) (SUB) (ADD))) "SIGFAULT")
+(test/exn (machine (list (INT_CONST 1) (SUB))) "SIGFAULT")
+(test/exn (machine (list (INT_CONST 1) (INT_CONST 4) (SUB) (ADD))) "SIGFAULT")
 
 (test/exn (machine (list
                     (CLOSURE (list (ACCESS 1) 
                                    (ACCESS 1) 
-                                   (CONST 1) 
+                                   (INT_CONST 1) 
                                    (APPLY) 
                                    (APPLY) 
                                    (RETURN)))
                     (LET)
                     (ACCESS 1)
                     (ACCESS 1)
-                    (CONST 1)
+                    (INT_CONST 1)
                     (APPLY)
                     (APPLY)
                     (ENDLET))) "SIGFAULT")
 
 (test (machine (list (CLOSURE (list (ACCESS 1)
-                                    (CONST 1)
+                                    (INT_CONST 1)
                                     (ADD)
                                     (RETURN)))
-                     (CONST 2)
+                     (INT_CONST 2)
                      (APPLY)))
-      (CONST 3))
+      (INT_CONST 3))
 
-(test (machine (list (CLOSURE (list (ACCESS 1) (CONST 1) (APPLY) (RETURN))) 
-                     (CLOSURE (list (ACCESS 1) (CONST 1) (ADD) (RETURN))) 
+(test (machine (list (CLOSURE (list (ACCESS 1) (INT_CONST 1) (APPLY) (RETURN))) 
+                     (CLOSURE (list (ACCESS 1) (INT_CONST 1) (ADD) (RETURN))) 
                      (APPLY))) 
-      (CONST 2))
+      (INT_CONST 2))
 
 
 
@@ -258,7 +258,7 @@
   (letrec ([e (deBruijn (parse expr))]
            [comp (λ(e)
                    (match e
-                     [(num n) (list (CONST n))]
+                     [(num n) (list (INT_CONST n))]
                      [(acc n) (list (ACCESS n))]
                      [(add l r) (append (comp l) (comp r) (list (ADD)))]
                      [(sub l r) (append (comp l) (comp r) (list (SUB)))]
@@ -270,40 +270,40 @@
     (comp e)))
 
 (test (compile '3)
-      (list (CONST 3)))
+      (list (INT_CONST 3)))
 
 (test (compile '{+ 3 2})
-      (list (CONST 3)
-            (CONST 2)
+      (list (INT_CONST 3)
+            (INT_CONST 2)
             (ADD)))
 
 (test (compile '{- 3 2})
-      (list (CONST 3)
-            (CONST 2)
+      (list (INT_CONST 3)
+            (INT_CONST 2)
             (SUB)))
 
 (test (compile '{- 5 {+ 1 2}})
-      (list (CONST 5)
-            (CONST 1)
-            (CONST 2)
+      (list (INT_CONST 5)
+            (INT_CONST 1)
+            (INT_CONST 2)
             (ADD)
             (SUB)))
 
 (test (compile '{{fun {x} {+ x 1}} 2})
       (list (CLOSURE (list (ACCESS 1)
-                           (CONST 1)
+                           (INT_CONST 1)
                            (ADD)
                            (RETURN)))
-            (CONST 2)
+            (INT_CONST 2)
             (APPLY)))
 
 (test (compile '{{fun {f} {f 1}} {fun {x} {+ x 1}}})
-      (list (CLOSURE (list (ACCESS 1) (CONST 1) (APPLY) (RETURN))) 
-            (CLOSURE (list (ACCESS 1) (CONST 1) (ADD) (RETURN))) 
+      (list (CLOSURE (list (ACCESS 1) (INT_CONST 1) (APPLY) (RETURN))) 
+            (CLOSURE (list (ACCESS 1) (INT_CONST 1) (ADD) (RETURN))) 
             (APPLY)))
 
 (test (compile '{with 3 in {acc 1}})
-      (list (CONST 3) 
+      (list (INT_CONST 3) 
             (LET) 
             (ACCESS 1) 
             (ENDLET)))
@@ -313,14 +313,14 @@
       (list
        (CLOSURE (list (ACCESS 1) 
                       (ACCESS 1) 
-                      (CONST 1) 
+                      (INT_CONST 1) 
                       (APPLY) 
                       (APPLY) 
                       (RETURN)))
        (LET)
        (ACCESS 1)
        (ACCESS 1)
-       (CONST 1)
+       (INT_CONST 1)
        (APPLY)
        (APPLY)
        (ENDLET)))
@@ -345,20 +345,20 @@
                      (filter CLOSURE? l))))
 
 
-(test (collectClosures (list (CLOSURE (list (CLOSURE (list (CONST 1) 
-                                                           (CONST 2) 
+(test (collectClosures (list (CLOSURE (list (CLOSURE (list (INT_CONST 1) 
+                                                           (INT_CONST 2) 
                                                            (ADD) 
                                                            (RETURN))) 
                                             (RETURN))) 
-                             (CONST 3) 
+                             (INT_CONST 3) 
                              (APPLY)))
-      (list (CLOSURE (list (CLOSURE (list (CONST 1) 
-                                          (CONST 2) 
+      (list (CLOSURE (list (CLOSURE (list (INT_CONST 1) 
+                                          (INT_CONST 2) 
                                           (ADD) 
                                           (RETURN))) 
                            (RETURN)))
-            (CLOSURE (list (CONST 1) 
-                           (CONST 2) 
+            (CLOSURE (list (INT_CONST 1) 
+                           (INT_CONST 2) 
                            (ADD) 
                            (RETURN)))))
 
@@ -398,13 +398,13 @@
                                                        (match k
                                                          [(CLOSURE ins) (cons (CLOSURE (replaceClosures ins)) v)]))))]
            [constants (apply string-append
-                             (map (λ(c) (let ([num (~a (CONST-n c))])
+                             (map (λ(c) (let ([num (~a (INT_CONST-n c))])
                                           (string-append "int" num ":\t.word\t" num "\n")))
-                                  (remove-duplicates (append (filter (λ(e)(CONST? e)) ins-list)
+                                  (remove-duplicates (append (filter (λ(e)(INT_CONST? e)) ins-list)
                                                              (apply append (hash-map replacedClosureHash
                                                                                      (λ(k v)
                                                                                        (match k
-                                                                                         [(CLOSURE ins) (filter CONST? ins)]))))))))]
+                                                                                         [(CLOSURE ins) (filter INT_CONST? ins)]))))))))]
            [captureEnvPrimitive (inline (list "\ncaptureEnv:"
                                               "lw $t0, 12($fp) \t\t# t0 = env-size"
                                               "li $t1, 4"
@@ -472,7 +472,7 @@
                                  "syscall"
                                  ))]
            [comp (λ(e)(match e
-                        [(CONST n) (inline (list (string-append "# (CONST " (~a n) ")")
+                        [(INT_CONST n) (inline (list (string-append "# (INT_CONST " (~a n) ")")
                                                  "addi $sp, $sp, -4"
                                                  (string-append "lw $t0, int" (~a n))
                                                  "sw $t0, 0($sp)"
@@ -638,7 +638,7 @@
     (display (spim-compile (compile prog)))
     (spim-compile-to-file prog "s.s"))
 
-#;(let ([prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}])
+(let ([prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}])
     (display (spim-compile (compile prog)))
     (spim-compile-to-file prog "s.s"))
 
@@ -651,18 +651,18 @@
     (display (spim-compile (compile prog)))
     (spim-compile-to-file prog "s.s"))
 
-(let ([prog  '{
+#;(let ([prog  '{
                {{fun {f}
                      {{fun {frec} {frec frec}}
                       {fun {next}
                            {fun {n}
                                 {{f {next next}} n}}}}}
-               
+                
                 {fun {next}
                      {fun {n}
                           {next n}}}}
                5}])
-(spim-compile-to-file prog "s.s"))
+  (spim-compile-to-file prog "s.s"))
 
 
 
