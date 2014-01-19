@@ -19,12 +19,11 @@
   (NOT)
   (ACCESS n)
   (CLOSURE ins)
-  (BRANCH exprs)
   (LET)
   (ENDLET)
   (APPLY)
   (RETURN)
-  (IF))
+  (IF tb fb))
 
 ;; values
 (deftype Val
@@ -71,16 +70,11 @@
                                     (def (INT_CONST n2) (stack-top (stack-pop stack)))
                                     (def new-stack (stack-pop (stack-pop stack)))
                                     (run tail (stack-push new-stack (INT_CONST (- n2 n1))) env)]
-             [(list (BRANCH exprs) tail ...) (run tail
-                                                  (stack-push stack exprs)
-                                                  env)]
-             [(list (IF) tail ...) (def (BOOL_CONST b) (stack-top stack))
-                                   (def t-branch (stack-top (stack-pop stack)))
-                                   (def f-branch (stack-top (stack-pop (stack-pop stack))))
-                                   (def new-stack (stack-pop (stack-pop (stack-pop stack))))
-                                   (if b
-                                       (run (append t-branch tail) new-stack env)
-                                       (run (append f-branch tail) new-stack env))]             
+             [(list (IF tb fb) tail ...) (def (BOOL_CONST b) (stack-top stack))
+                                         (def new-stack (stack-pop stack))
+                                         (if b
+                                             (run (append tb tail) new-stack env)
+                                             (run (append fb tail) new-stack env))]             
              [(list (ACCESS n) tail ...) (run tail 
                                               (stack-push stack (list-ref env (- n 1))) 
                                               env)]
@@ -132,16 +126,14 @@
                      (ENDLET)))
       (INT_CONST 3))
 
-(test (machine (list (BRANCH (list (INT_CONST 2))) 
-                     (BRANCH (list (INT_CONST 1))) 
-                     (BOOL_CONST #t) 
-                     (IF)))
+(test (machine (list (BOOL_CONST #t) 
+                     (IF (list (INT_CONST 1))
+                         (list (INT_CONST 2)))))
       (INT_CONST 1))
 
-(test (machine (list (BRANCH (list (INT_CONST 2))) 
-                     (BRANCH (list (INT_CONST 1))) 
-                     (BOOL_CONST #f) 
-                     (IF)))
+(test (machine (list (BOOL_CONST #f) 
+                     (IF (list (INT_CONST 1))
+                         (list (INT_CONST 2)))))
       (INT_CONST 2))
 
 (test (machine (list
@@ -151,10 +143,9 @@
                    (list
                     (CLOSURE
                      (list
-                      (BRANCH (list (ACCESS 2)))
-                      (BRANCH (list (ACCESS 3)))
                       (ACCESS 1)
-                      (IF)
+                      (IF (list (ACCESS 3))
+                          (list (ACCESS 2)))
                       (RETURN)))
                     (RETURN)))
                   (RETURN)))
@@ -281,6 +272,7 @@
                           ))])
     (match expr
       [(num n) (num n)]
+      [(bool b) (bool b)]
       [(acc n) (acc n)]
       [(id x) (id x)]
       [(add l r) (add (deBruijn l) (deBruijn r))]
@@ -325,10 +317,9 @@
                      [(acc n) (list (ACCESS n))]
                      [(add l r) (append (comp l) (comp r) (list (ADD)))]
                      [(sub l r) (append (comp l) (comp r) (list (SUB)))]
-                     [(my-if c t f) (append (list (BRANCH (comp f)))
-                                            (list (BRANCH (comp t)))
-                                            (comp c)
-                                            (list (IF)))]
+                     [(my-if c t f) (append (comp c)
+                                            (list (IF (comp t)
+                                                      (comp f))))]
                      [(with a b) (append (comp a) (list (LET)) (comp b) (list (ENDLET)))]
                      [(app a b) (append (comp a) (comp b) (list (APPLY)))]
                      [(fun id body) (list (CLOSURE (append (comp body) (list (RETURN)))))]
@@ -697,39 +688,18 @@
                    #:exists 'replace))
 
 
-#;(let ([prog '{{fun {x} {fun {y} y}} 0}])
-    (display (spim-compile (compile prog)))
-    (spim-compile-to-file prog "s.s"))
-
-#;(let ([prog '{{{fun {x} {fun {y} x}} 3} 4}])
-    (display (spim-compile (compile prog)))
-    (spim-compile-to-file prog "s.s"))
-
-(let ([prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}])
+#;(let (
+      #;[prog '{{fun {x} {fun {y} y}} 0}]
+      #;[prog '{{{fun {x} {fun {y} x}} 3} 4}]
+      #;[prog '{{{fun {f} 
+                      {fun {arg} {f arg}}} {fun {x} {+ x 1}}} 5}]
+      #;[prog '{+ {fun {f} f} 3}]
+      #;[prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}]
+      [prog '{if #t 1 2}]
+      )
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
 
-#;(let ([prog '{+ {fun {f} f} 3}])
-    (display (spim-compile (compile prog)))
-    (spim-compile-to-file prog "s.s"))
-
-#;(let ([prog '{{{fun {f} 
-                      {fun {arg} {f arg}}} {fun {x} {+ x 1}}} 5}])
-    (display (spim-compile (compile prog)))
-    (spim-compile-to-file prog "s.s"))
-
-#;(let ([prog  '{
-                 {{fun {f}
-                       {{fun {frec} {frec frec}}
-                        {fun {next}
-                             {fun {n}
-                                  {{f {next next}} n}}}}}
-                  
-                  {fun {next}
-                       {fun {n}
-                            {next n}}}}
-                 5}])
-    (spim-compile-to-file prog "s.s"))
 
 
 
