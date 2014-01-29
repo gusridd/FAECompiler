@@ -44,6 +44,12 @@
     (stack-debug stack)
     (display "\n")))
 
+;; Counter for conditional branch definitions
+(define counter (let* ([c 0]
+                       [f (λ() (set! c (+ 1 c))
+                            c)])
+                  f))
+
 ;; run :: List[Instruction], Stack[Instructions], List -> CONST
 (defun (run ins-list stack env)
   ;(debug-run ins-list stack)
@@ -455,14 +461,24 @@
                                                      (λ(k v)
                                                        (match k
                                                          [(CLOSURE ins) (cons (CLOSURE (replaceClosures ins)) v)]))))]
+           [traverseIF (λ(l) (map (λ(e)
+                                    (match e
+                                      [(IF tb fb) (append (filter INT_CONST? l)
+                                                          (traverseIF tb)
+                                                          (traverseIF fb))])) 
+                                  (filter IF? l)))]
            [constants (apply string-append
                              (map (λ(c) (let ([num (~a (INT_CONST-n c))])
                                           (string-append "int" num ":\t.word\t" num "\n")))
-                                  (remove-duplicates (append (filter (λ(e)(INT_CONST? e)) ins-list)
+                                  (remove-duplicates (append (filter (λ(e)(INT_CONST? e)) 
+                                                                     ins-list)
+                                                             (traverseIF ins-list)
                                                              (apply append (hash-map replacedClosureHash
                                                                                      (λ(k v)
                                                                                        (match k
-                                                                                         [(CLOSURE ins) (filter INT_CONST? ins)]))))))))]
+                                                                                         [(CLOSURE ins) (append 
+                                                                                                         (filter INT_CONST? ins)
+                                                                                                         (traverseIF ins))]))))))))]
            [captureEnvPrimitive (inline (list "\ncaptureEnv:"
                                               "lw $t0, 12($fp) \t\t# t0 = env-size"
                                               "li $t1, 4"
@@ -538,6 +554,27 @@
                                                      "li $t0, 2"
                                                      "sw $t0, 0($sp) \t# put the size of int"
                                                      ))]
+                        [(BOOL_CONST b) (inline (list (string-append "# (BOOL_CONST " (~a b) ")")
+                                                      "addi $sp, $sp, -4"
+                                                      (string-append "lw $t0, " (if b "bool_t" "bool_f"))
+                                                      "sw $t0, 0($sp)"
+                                                      "addi $sp, $sp, -4"
+                                                      "li $t0, 2"
+                                                      "sw $t0, 0($sp) \t# put the size of int"
+                                                      ))]
+                        [(IF tb fb) (let ([n_branch (counter)])
+                                      (string-append
+                                       (inline (list "# (IF)"
+                                                     "lw $t0, 4($sp)"
+                                                     "lw $t1, bool_t"
+                                                     (string-append "bne $t0, $t1, branch_false_" (~a n_branch))
+                                                     ))
+                                       (apply string-append (map comp tb))
+                                       (string-append "\tj branch_end_" (~a n_branch) "\n")
+                                       (string-append "branch_false_" (~a n_branch) ":\n")
+                                       (apply string-append (map comp fb))
+                                       (string-append "branch_end_" (~a n_branch) ":\n")
+                                       ))]
                         [(CLOSURE_CONST n) (inline (list (string-append "# (CLOSURE_CONST " (~a n) ")")
                                                          "addi $sp, $sp, -4"
                                                          "#sw $ra, 0($fp)"
@@ -666,6 +703,8 @@
                                       ))])
     (string-append "\t\t.data\n"
                    "new_line:\t.asciiz \"\\n\"\n"
+                   "bool_t:\t.word\t1\n"
+                   "bool_f:\t.word\t0\n"
                    constants
                    "\n\t\t.text\n"
                    copy
@@ -688,14 +727,14 @@
                    #:exists 'replace))
 
 
-#;(let (
+(let (
       #;[prog '{{fun {x} {fun {y} y}} 0}]
-      #;[prog '{{{fun {x} {fun {y} x}} 3} 4}]
+      [prog '{{{fun {x} {fun {y} x}} 3} 4}]
       #;[prog '{{{fun {f} 
                       {fun {arg} {f arg}}} {fun {x} {+ x 1}}} 5}]
       #;[prog '{+ {fun {f} f} 3}]
       #;[prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}]
-      [prog '{if #t 1 2}]
+      #;[prog '{if #t 1 2}]
       )
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
