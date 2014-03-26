@@ -401,9 +401,41 @@
 (test (i-map (λ(e i) i) (list 1 1 1 1 1 1 1)) (list 1 2 3 4 5 6 7))
 (test (i-map (λ(e i) (cons e i)) (list 1 1 1 1 1 1 1)) '((1 . 1) (1 . 2) (1 . 3) (1 . 4) (1 . 5) (1 . 6) (1 . 7)))
 
+#;(deftype Instruction
+  (INT_CONST n)
+  (BOOL_CONST b)
+  (CLOSURE_CONST name)
+  (ADD)
+  (SUB)
+  (AND)
+  (OR)
+  (NOT)
+  (ACCESS n)
+  (CLOSURE ins)
+  (LET)
+  (ENDLET)
+  (APPLY)
+  (RETURN)
+  (IF tb fb))
+
+(define (collect ins-list pred)
+  (letrec ([col (λ(i-l collected)
+                  (let ([found (filter pred i-l)]
+                        [deep (map (λ(e)
+                                     (match e
+                                       [(CLOSURE ins) (col ins '())]
+                                       [(IF tb fb) (append (col tb '())
+                                                           (col fb '()))]
+                                       [_ '()])) i-l)])
+                    (append found (apply append deep))))])
+    (col ins-list '())))
+
+(define (collectClosures l)
+  (collect l CLOSURE?))
+
 
 ;; collectClosures :: List[Expr] -> List[Closure]
-(defun (collectClosures l)
+#;(defun (collectClosures l)
   (apply append (map (λ(c) 
                        (cons c (collectClosures (CLOSURE-ins c)))) 
                      (filter CLOSURE? l))))
@@ -426,6 +458,16 @@
                            (ADD) 
                            (RETURN)))))
 
+(test (collectClosures (list
+                        (BOOL_CONST #t)
+                        (IF
+                         (list
+                          (CLOSURE
+                           (list (ACCESS 1) (INT_CONST 1) (APPLY) (RETURN))))
+                         (list (INT_CONST 2)))))
+      (list (CLOSURE
+             (list (ACCESS 1) (INT_CONST 1) (APPLY) (RETURN)))))
+
 ;;
 ;; $t0 -> first parameter
 ;; $t1 -> second parameter
@@ -446,6 +488,8 @@
 
 ;; rules
 ;; before function aplication the environment must be copied into the stack, save the frame pointer to the top and the new parameter be placed at top. Refresh the fp and the sp
+
+
 
 
 (defun (spim-compile ins-list)
@@ -729,12 +773,12 @@
 
 (let (
       #;[prog '{{fun {x} {fun {y} y}} 0}]
-      [prog '{{{fun {x} {fun {y} x}} 3} 4}]
+      #;[prog '{{{fun {x} {fun {y} x}} 3} 4}]
       #;[prog '{{{fun {f} 
                       {fun {arg} {f arg}}} {fun {x} {+ x 1}}} 5}]
       #;[prog '{+ {fun {f} f} 3}]
       #;[prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}]
-      #;[prog '{if #t 1 2}]
+      [prog '{if #t 1 2}]
       )
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
