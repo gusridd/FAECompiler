@@ -401,23 +401,7 @@
 (test (i-map (λ(e i) i) (list 1 1 1 1 1 1 1)) (list 1 2 3 4 5 6 7))
 (test (i-map (λ(e i) (cons e i)) (list 1 1 1 1 1 1 1)) '((1 . 1) (1 . 2) (1 . 3) (1 . 4) (1 . 5) (1 . 6) (1 . 7)))
 
-#;(deftype Instruction
-  (INT_CONST n)
-  (BOOL_CONST b)
-  (CLOSURE_CONST name)
-  (ADD)
-  (SUB)
-  (AND)
-  (OR)
-  (NOT)
-  (ACCESS n)
-  (CLOSURE ins)
-  (LET)
-  (ENDLET)
-  (APPLY)
-  (RETURN)
-  (IF tb fb))
-
+;; collect :: List[Expr], (Expr->Bool) -> List[Expr]
 (define (collect ins-list pred)
   (letrec ([col (λ(i-l collected)
                   (let ([found (filter pred i-l)]
@@ -430,16 +414,9 @@
                     (append found (apply append deep))))])
     (col ins-list '())))
 
+;; collectClosures :: List[Expr] -> List[Closure]
 (define (collectClosures l)
   (collect l CLOSURE?))
-
-
-;; collectClosures :: List[Expr] -> List[Closure]
-#;(defun (collectClosures l)
-  (apply append (map (λ(c) 
-                       (cons c (collectClosures (CLOSURE-ins c)))) 
-                     (filter CLOSURE? l))))
-
 
 (test (collectClosures (list (CLOSURE (list (CLOSURE (list (INT_CONST 1) 
                                                            (INT_CONST 2) 
@@ -467,6 +444,23 @@
                          (list (INT_CONST 2)))))
       (list (CLOSURE
              (list (ACCESS 1) (INT_CONST 1) (APPLY) (RETURN)))))
+
+(test (collectClosures (list
+                        (CLOSURE
+                         (list
+                          (BOOL_CONST #t)
+                          (IF
+                           (list (CLOSURE (list (ACCESS 1) (RETURN))))
+                           (list (INT_CONST 3)))
+                          (RETURN)))))
+      (list (CLOSURE
+             (list
+              (BOOL_CONST #t)
+              (IF
+               (list (CLOSURE (list (ACCESS 1) (RETURN))))
+               (list (INT_CONST 3)))
+              (RETURN)))
+            (CLOSURE (list (ACCESS 1) (RETURN))))) 
 
 ;;
 ;; $t0 -> first parameter
