@@ -508,15 +508,9 @@
            [constants (apply string-append
                              (map (λ(c) (let ([num (~a (INT_CONST-n c))])
                                           (string-append "int" num ":\t.word\t" num "\n")))
-                                  (remove-duplicates (append (filter (λ(e)(INT_CONST? e)) 
-                                                                     ins-list)
-                                                             (traverseIF ins-list)
-                                                             (apply append (hash-map replacedClosureHash
-                                                                                     (λ(k v)
-                                                                                       (match k
-                                                                                         [(CLOSURE ins) (append 
-                                                                                                         (filter INT_CONST? ins)
-                                                                                                         (traverseIF ins))]))))))))]
+                                  (remove-duplicates (collect ins-list INT_CONST?))))]
+
+           
            [captureEnvPrimitive (inline (list "\ncaptureEnv:"
                                               "lw $t0, 12($fp) \t\t# t0 = env-size"
                                               "li $t1, 4"
@@ -767,12 +761,12 @@
 
 (let (
       #;[prog '{{fun {x} {fun {y} y}} 0}]
-      #;[prog '{{{fun {x} {fun {y} x}} 3} 4}]
+      [prog '{{{fun {x} {fun {y} x}} 3} 4}]
       #;[prog '{{{fun {f} 
                       {fun {arg} {f arg}}} {fun {x} {+ x 1}}} 5}]
       #;[prog '{+ {fun {f} f} 3}]
       #;[prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}]
-      [prog '{if #t 1 2}]
+      #;[prog '{if #t 1 2}]
       )
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
