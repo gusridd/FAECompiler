@@ -753,16 +753,46 @@
 
 (let (
       #;[prog '{{fun {x} {fun {y} y}} 0}]
-      [prog '{{{fun {x} {fun {y} x}} 3} 4}]
+      #;[prog '{{{fun {x} {fun {y} x}} 3} 4}]
       #;[prog '{{{fun {f} 
                       {fun {arg} {f arg}}} {fun {x} {+ x 1}}} 5}]
       #;[prog '{+ {fun {f} f} 3}]
       #;[prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}]
-      #;[prog '{if #t 1 2}]
+      #;[prog '{if #f 1 2}]
+      #;[prog '{if 5 1 2}]
+      [prog '{{fun {x} {if x x {if #t 10 20}}} #f}]
+      #;[prog '{{fun {f} {if f 1 2}} #f}]
+      #;[prog '(((fun (f)
+                    ((fun (x) (x x))
+                     (fun (x) (f (fun (y) ((x x) y)))))) 
+               (fun (f)
+                    (fun (n)
+                         (if n
+                             1
+                             (+ n (f (- n 1))))))) 3)]
       )
   (display (spim-compile (compile prog)))
   (spim-compile-to-file prog "s.s"))
 
 
+(define Y (λ (f)
+            ((λ(x) (x x))
+             (λ(x) (f (λ (y) ((x x) y)))))))
 
+(define almost-factorial
+  (λ (f)
+    (λ (n)
+      (if (= n 0)
+          1
+          (* n (f (- n 1)))))))
 
+(define factorial (Y almost-factorial))
+
+(((λ (f)
+    ((λ(x) (x x))
+     (λ(x) (f (λ (y) ((x x) y)))))) 
+  (λ (f)
+    (λ (n)
+      (if (= n 0)
+          1
+          (+ n (f (- n 1))))))) 3)
