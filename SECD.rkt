@@ -499,18 +499,10 @@
                                                      (λ(k v)
                                                        (match k
                                                          [(CLOSURE ins) (cons (CLOSURE (replaceClosures ins)) v)]))))]
-           [traverseIF (λ(l) (map (λ(e)
-                                    (match e
-                                      [(IF tb fb) (append (filter INT_CONST? l)
-                                                          (traverseIF tb)
-                                                          (traverseIF fb))])) 
-                                  (filter IF? l)))]
            [constants (apply string-append
                              (map (λ(c) (let ([num (~a (INT_CONST-n c))])
                                           (string-append "int" num ":\t.word\t" num "\n")))
                                   (remove-duplicates (collect ins-list INT_CONST?))))]
-
-           
            [captureEnvPrimitive (inline (list "\ncaptureEnv:"
                                               "lw $t0, 12($fp) \t\t# t0 = env-size"
                                               "li $t1, 4"
