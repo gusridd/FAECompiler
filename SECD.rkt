@@ -36,7 +36,7 @@
   (bruijnNumber n))
 
 ;; Debug function for the machine
-(defun (debug-run ins-list stack)
+(define (debug-run ins-list stack)
   (begin
     (display "\ninstructions: ")
     (print ins-list)
@@ -51,7 +51,7 @@
                   f))
 
 ;; run :: List[Instruction], Stack[Instructions], List -> CONST
-(defun (run ins-list stack env)
+(define (run ins-list stack env)
   ;(debug-run ins-list stack)
   (match ins-list
     ['() (if (= 1 (stack-size stack))
@@ -107,7 +107,7 @@
                                             (stack-push s return-value)
                                             ep)])))]))
 
-(defun (machine ins-list)
+(define (machine ins-list)
   (run ins-list (stack-init) '()))
 
 
@@ -239,7 +239,7 @@
   (fun id body))
 
 ;; parse :: s-expr -> Expr
-(defun (parse s-expr)
+(define (parse s-expr)
   (match s-expr
     [(? number?) (num s-expr)]
     [(? boolean?) (bool s-expr)]
@@ -255,7 +255,7 @@
     [(list f a) (app (parse f) (parse a))]))
 
 ;; deBruijn :: Expr -> Expr + Intermediate
-(defun (deBruijn expr)
+(define (deBruijn expr)
   (letrec ([auxBruijn (λ(e bid lvl)
                         (match e
                           [(num n) (num n)]
@@ -314,7 +314,7 @@
        (app (acc 1) (app (acc 1) (num 1)))))
 
 ;; compile :: Expr -> List[Instruction]
-(defun (compile expr)
+(define (compile expr)
   (letrec ([e (deBruijn (parse expr))]
            [comp (λ(e)
                    (match e
@@ -390,7 +390,7 @@
        (ENDLET)))
 
 
-(defun (i-map fun list)
+(define (i-map fun list)
   (letrec ([indexed (λ(l i)
                       (match l
                         ['() '()]
@@ -486,7 +486,7 @@
 
 
 
-(defun (spim-compile ins-list)
+(define (spim-compile ins-list)
   (letrec ([inline (λ(l) (apply string-append (map (λ(s) (string-append "\t" s "\n")) 
                                                    l)))]
            [closureHash (make-hash (i-map (λ(e i) 
@@ -744,7 +744,7 @@
                    ending
                    )))
 
-(defun (spim-compile-to-file s-expr filename)
+(define (spim-compile-to-file s-expr filename)
   (display-to-file (spim-compile (compile s-expr))
                    filename
                    #:mode 'text
