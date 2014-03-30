@@ -720,6 +720,8 @@
            [funDefs (inline (hash-map replacedClosureHash
                                       (λ(k v) (string-append "\n" v ": # label for "
                                                              v
+                                                             "\n"
+                                                             (~a k)
                                                              "\n\tsw $ra, 8($fp) \t# save old $ra"
                                                              (apply string-append (map comp (CLOSURE-ins k)))
                                                              ))
@@ -754,13 +756,13 @@
 (let (
       #;[prog '{{fun {x} {fun {y} y}} 0}]
       #;[prog '{{{fun {x} {fun {y} x}} 3} 4}]
-      #;[prog '{{{fun {f} 
+      [prog '{{{fun {f} 
                       {fun {arg} {f arg}}} {fun {x} {+ x 1}}} 5}]
       #;[prog '{+ {fun {f} f} 3}]
       #;[prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}]
       #;[prog '{if #f 1 2}]
       #;[prog '{if 5 1 2}]
-      [prog '{{fun {x} {if x x {if #t 10 20}}} #f}]
+      #;[prog '{{fun {x} {if x x {if x 10 20}}} #f}]
       #;[prog '{{fun {f} {if f 1 2}} #f}]
       #;[prog '(((fun (f)
                     ((fun (x) (x x))
