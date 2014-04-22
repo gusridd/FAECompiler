@@ -60,6 +60,12 @@
       (CONST 3))
 
 (test (run (list (CONST 5)
+                 (CONST 6)
+                 (SUB)) 
+           (stack-init))
+      (CONST -1))
+
+(test (run (list (CONST 5)
                  (CONST 1)
                  (CONST 2)
                  (ADD)

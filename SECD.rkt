@@ -210,6 +210,12 @@
                      (APPLY))) 
       (INT_CONST 2))
 
+(test (machine (list (INT_CONST 5)
+                     (LET)
+                     (ACCESS 1)
+                     (ENDLET)))
+      (INT_CONST 5))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;
