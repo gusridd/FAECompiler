@@ -32,4 +32,15 @@ user@machine spim
 
 ```
 
+## Example file
+
+The following example is a corresponds to a function which receives a function "f" and returns a function that applies "f" to its argument "arg". In the example a function which adds one to its argument is passed as "f" and the actual arithmetic argument is 5.
+
+```
+{{{fun {f} 
+       {fun {arg} 
+            {f arg}}} 
+  {fun {x} {+ x 1}}} 5}
+```
+
 
