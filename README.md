@@ -4,15 +4,15 @@ This project is a compiler for the FAE language, studied in the cource of progra
 
 ## Syntax
 
+The syntax of the language is a sub-set of the racket syntax. The language implements functions as closures.
+
 ```racket
-<expr> ::= <num>
-         | <id>
-         | {acc <num>}
-         | {+ <expr> <expr>}
-         | {- <expr> <expr>}
-         | {with <expr> in <expr>}
-         | {fun {<id>} <expr>}
-         | {<expr> <expr>}
+<expr> ::= <num>                        number
+         | <id>                         indentifier
+         | {+ <expr> <expr>}            arithmetic addition
+         | {- <expr> <expr>}            arithmetic subtraction
+         | {fun {<id>} <expr>}          function definition
+         | {<expr> <expr>}              function application
 ```
 
 ## Usage
