@@ -759,10 +759,10 @@
                    #:exists 'replace))
 
 
-(let (
+#;(let (
       #;[prog '{{fun {x} {fun {y} y}} 0}]
       #;[prog '{{{fun {x} {fun {y} x}} 3} 4}]
-      [prog '{{{fun {f} 
+      #;[prog '{{{fun {f} 
                       {fun {arg} {f arg}}} {fun {x} {+ x 1}}} 5}]
       #;[prog '{+ {fun {f} f} 3}]
       #;[prog '{{fun {f} {f 1}} {fun {x} {+ x 1}}}]
@@ -783,20 +783,20 @@
   (spim-compile-to-file prog "s.s"))
 
 
-(define Y (λ (f)
+#;(define Y (λ (f)
             ((λ(x) (x x))
              (λ(x) (f (λ (y) ((x x) y)))))))
 
-(define almost-factorial
+#;(define almost-factorial
   (λ (f)
     (λ (n)
       (if (= n 0)
           1
           (* n (f (- n 1)))))))
 
-(define factorial (Y almost-factorial))
+#;(define factorial (Y almost-factorial))
 
-(((λ (f)
+#;(((λ (f)
     ((λ(x) (x x))
      (λ(x) (f (λ (y) ((x x) y)))))) 
   (λ (f)
